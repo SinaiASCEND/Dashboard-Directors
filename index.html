@@ -37327,7 +37327,7 @@ function VariantB() {
 
   return (
     <div className="dash" data-screen-label={`B · ${view}`}>
-      <Topbar variantLabel="Outcomes-First" role={role} onRoleChange={setRole} crumbs={crumbs} roles={["Accreditor", "Curriculum Team"]} />
+      <Topbar variantLabel="Program Objectives" role={role} onRoleChange={setRole} crumbs={crumbs} roles={["Accreditor", "Curriculum Team"]} />
       <div style={{ display: "flex", minHeight: 980 }}>
         <SideNavB view={view} setView={setView} mepoCode={mepoCode} setMepoCode={setMepoCode} />
         <div style={{ flex: 1, padding: "20px 24px", background: "var(--grey-1)", minWidth: 0 }}>
@@ -38342,8 +38342,6 @@ const { useState: useStateD, useMemo: useMemoD } = React;
 //
 // Counts in the right-hand badge are derived from modulesFilter / items.length.
 const BROWSE_TREE = [
-  { kind: "section-header", label: "ASCEND Phases" },
-
   { kind: "leaf", id: "legacy", label: "Legacy Curriculum", sub: "Pre-triphasic clerkships & AIs",
     items: [
       { id: "lc-amb", label: "Ambulatory Care-Geriatrics Clerkship",    placeholder: true },
@@ -38365,6 +38363,8 @@ const BROWSE_TREE = [
             ] },
         ] },
     ] },
+
+  { kind: "section-header", label: "ASCEND Phases" },
 
   { kind: "group-header", label: "Phase 1" },
   { kind: "leaf", id: "p1-found", label: "Foundations",    indent: 1, modulesFilter: m => m.phase === "Foundations" },
@@ -40527,7 +40527,7 @@ const { useState: useStateApp, useEffect: useEffectApp } = React;
 const LENSES = [
   { id: "D", label: "ASCEND Navigator", subtitle: "Phase → Module → Session → MLO → MEPO",
     color: "var(--brand-cyan)", deep: "var(--brand-cyan-deep)", tint: "var(--brand-cyan-tint)" },
-  { id: "B", label: "Program Outcomes",     subtitle: "Where each MEPO is taught and assessed across the curriculum",
+  { id: "B", label: "Program Objectives",     subtitle: "Where each MEPO is taught and assessed across the curriculum",
     color: "var(--brand-violet)", deep: "var(--brand-violet)", tint: "var(--brand-violet-tint)" },
   { id: "A", label: "Module Performance",   subtitle: "Exam analytics, item review, and blueprint coverage per module",
     color: "var(--brand-magenta)", deep: "var(--brand-magenta-deep)", tint: "#FBE5F0" },
