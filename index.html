@@ -41686,7 +41686,7 @@ function AocThreadDetail({ picked, onBack, onOpenSession }) {
 // phone-friendly grouped list. Search filters across name, role, section.
 function MobileCalendarTab() {
   const sans = "'Inter Tight', system-ui, sans-serif";
-  const all = (typeof window !== "undefined" && window.ASCEND_CALENDAR_2026_27) || [];
+  const all = (typeof window !== "undefined" && (window.ASCEND_CALENDAR_ALL || window.ASCEND_CALENDAR_2026_27)) || [];
   const CLASS_OPTIONS = [
     { id: "all", label: "All classes" },
     { id: "M1",  label: "Class of 2030 (M1)" },
@@ -41694,6 +41694,42 @@ function MobileCalendarTab() {
     { id: "M3",  label: "Class of 2028 (M3)" },
     { id: "M4",  label: "Class of 2027 (M4)" },
   ];
+  // Class pill: different shape + color per class so the ALL view shows at a
+  // glance which class each event belongs to. Shapes are intentionally
+  // distinct (circle / rounded-square / pill / diamond) to be readable
+  // without color (a11y).
+  const CLASS_PILL = {
+    M1: { color: "#008CC0", bg: "rgba(0,140,192,0.14)",  shape: "circle"  },
+    M2: { color: "#221F72", bg: "rgba(34,31,114,0.12)",  shape: "rounded" },
+    M3: { color: "#D80B8C", bg: "rgba(216,11,140,0.12)", shape: "pill"    },
+    M4: { color: "#58595B", bg: "rgba(88,89,91,0.14)",   shape: "diamond" },
+  };
+  function ClassPill({ cls }) {
+    const p = CLASS_PILL[cls];
+    if (!p) return null;
+    if (p.shape === "diamond") {
+      // Rotated square — needs an inner wrapper for un-rotated text.
+      return (
+        <span style={{ display: "inline-grid", placeItems: "center", width: 22, height: 22, flexShrink: 0 }}>
+          <span style={{ width: 16, height: 16, background: p.bg, border: "1.5px solid " + p.color, transform: "rotate(45deg)", borderRadius: 2 }}/>
+          <span style={{ position: "absolute", fontSize: 9, fontWeight: 700, color: p.color, letterSpacing: 0.2 }}>{cls}</span>
+        </span>
+      );
+    }
+    const radius = p.shape === "circle" ? "50%" : p.shape === "rounded" ? 4 : 999;
+    const px = p.shape === "circle" ? 5 : p.shape === "rounded" ? 6 : 8;
+    const w = p.shape === "circle" ? 22 : "auto";
+    const h = p.shape === "circle" ? 22 : "auto";
+    return (
+      <span style={{
+        display: "inline-flex", alignItems: "center", justifyContent: "center",
+        background: p.bg, color: p.color, fontWeight: 700,
+        fontSize: 9, letterSpacing: 0.3, padding: p.shape === "circle" ? 0 : `2px ${px}px`,
+        borderRadius: radius, border: "1.5px solid " + p.color,
+        width: w, height: h, minWidth: w, lineHeight: 1, flexShrink: 0,
+      }}>{cls}</span>
+    );
+  }
   const [classFilter, setClassFilter] = useStateMA("all");
   const KIND_COLOR = {
     module:     { bg: "rgba(0,174,239,0.10)",   chip: BRAND.cyanDeep,    label: "Module" },
@@ -41722,10 +41758,28 @@ function MobileCalendarTab() {
     return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0]));
   }, [filtered]);
 
-  function fmtMonth(key) {
-    const [y, mo] = key.split("-").map(Number);
-    return new Date(y, mo - 1, 1).toLocaleString(undefined, { month: "long", year: "numeric" });
-  }
+  // Auto-scroll to the current month on mount so the calendar opens to "today".
+  // Falls back to the first month if today is outside the AY range.
+  const scrollHostRef = React.useRef(null);
+  const monthRefs = React.useRef({});
+  React.useEffect(() => {
+    const now = new Date();
+    const cur = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    // Find the closest month >= current (or last available)
+    const months = byMonth.map((b) => b[0]);
+    let target = months.find((m) => m === cur);
+    if (!target) target = months.find((m) => m > cur);
+    if (!target) target = months[months.length - 1];
+    if (!target) return;
+    const el = monthRefs.current[target];
+    const host = scrollHostRef.current;
+    if (el && host) {
+      // Use offsetTop relative to host, instead of scrollIntoView (which can
+      // disrupt the surrounding app shell).
+      const top = el.offsetTop - 8;
+      host.scrollTop = Math.max(0, top);
+    }
+  }, [byMonth.length, classFilter]);
   function fmtDate(iso) {
     const [y, mo, d] = iso.split("-").map(Number);
     const dt = new Date(y, mo - 1, d);
@@ -41745,7 +41799,7 @@ function MobileCalendarTab() {
           <div style={{ width: 10, height: 10, borderRadius: 2, background: "#fff" }}/>
           <div style={{ fontSize: 19, fontWeight: 600, letterSpacing: -0.2 }}>Academic Calendar</div>
         </div>
-        <div style={{ padding: "0 16px", fontSize: 12.5, opacity: 0.9, marginBottom: 8 }}>AY 2026–27 · ISMMS MD Program</div>
+        <div style={{ padding: "0 16px", fontSize: 12.5, opacity: 0.9, marginBottom: 8 }}>AY 2025–26 & 2026–27 · ISMMS MD Program</div>
         {/* Class chips */}
         <div style={{ padding: "0 12px", display: "flex", gap: 5, overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
           {CLASS_OPTIONS.map((c) => {
@@ -41764,14 +41818,14 @@ function MobileCalendarTab() {
         </div>
       </div>
       {/* Body */}
-      <div style={{ flex: 1, overflowY: "auto", padding: "14px 14px 18px", WebkitOverflowScrolling: "touch" }}>
+      <div ref={scrollHostRef} style={{ flex: 1, overflowY: "auto", padding: "14px 14px 18px", WebkitOverflowScrolling: "touch" }}>
         {byMonth.length === 0 && (
           <div style={{ background: "#fff", borderRadius: 12, padding: "30px 22px", textAlign: "center", color: BRAND.grey11 }}>
             No events for this filter.
           </div>
         )}
         {byMonth.map(([monthKey, events]) => (
-          <div key={monthKey} style={{ marginBottom: 16 }}>
+          <div key={monthKey} ref={(el) => { monthRefs.current[monthKey] = el; }} style={{ marginBottom: 16, scrollMarginTop: 12 }}>
             <div style={{ fontSize: 11, color: BRAND.grey11, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700, padding: "4px 4px 8px", display: "flex", alignItems: "baseline", gap: 8 }}>
               <span>{fmtMonth(monthKey)}</span>
               <span style={{ color: BRAND.grey7, fontWeight: 600 }}>· {events.length}</span>
@@ -41809,9 +41863,7 @@ function MobileCalendarTab() {
                           </span>
                         )}
                         {ev.className && classFilter === "all" && (
-                          <span style={{ fontSize: 9.5, color: BRAND.grey11, fontWeight: 700, letterSpacing: 0.4 }}>
-                            {ev.className}
-                          </span>
+                          <ClassPill cls={ev.className}/>
                         )}
                       </div>
                       <div style={{ fontSize: 13.5, color: BRAND.ink, lineHeight: 1.35, fontWeight: 600 }}>{ev.label}</div>
