@@ -41763,23 +41763,28 @@ function MobileCalendarTab() {
   const scrollHostRef = React.useRef(null);
   const monthRefs = React.useRef({});
   React.useEffect(() => {
-    const now = new Date();
-    const cur = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-    // Find the closest month >= current (or last available)
-    const months = byMonth.map((b) => b[0]);
-    let target = months.find((m) => m === cur);
-    if (!target) target = months.find((m) => m > cur);
-    if (!target) target = months[months.length - 1];
-    if (!target) return;
-    const el = monthRefs.current[target];
-    const host = scrollHostRef.current;
-    if (el && host) {
-      // Use offsetTop relative to host, instead of scrollIntoView (which can
-      // disrupt the surrounding app shell).
-      const top = el.offsetTop - 8;
+    // requestAnimationFrame ensures the DOM has painted before we measure
+    // offsetTop / getBoundingClientRect.
+    const handle = window.requestAnimationFrame(() => {
+      const now = new Date();
+      const cur = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+      const months = byMonth.map((b) => b[0]);
+      let target = months.find((m) => m === cur);
+      if (!target) target = months.find((m) => m > cur);
+      if (!target) target = months[months.length - 1];
+      if (!target) return;
+      const el = monthRefs.current[target];
+      const host = scrollHostRef.current;
+      if (!el || !host) return;
+      // Compute offset relative to the scroll host using rects, which is
+      // robust to whatever positioned ancestor the element sits inside.
+      const hostRect = host.getBoundingClientRect();
+      const elRect = el.getBoundingClientRect();
+      const top = (elRect.top - hostRect.top) + host.scrollTop - 8;
       host.scrollTop = Math.max(0, top);
-    }
-  }, [byMonth.length, classFilter]);
+    });
+    return () => window.cancelAnimationFrame(handle);
+  }, [byMonth, classFilter]);
   function fmtDate(iso) {
     const [y, mo, d] = iso.split("-").map(Number);
     const dt = new Date(y, mo - 1, d);
