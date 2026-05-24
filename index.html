@@ -43946,7 +43946,7 @@ function MobileApp() {
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", background: BRAND.bg, overflow: "hidden", position: "relative" }}>
-      <div style={{ position: "absolute", inset: 0, paddingBottom: "calc(env(safe-area-inset-bottom, 18px) + 56px)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      <div style={{ position: "absolute", inset: 0, paddingBottom: "calc(env(safe-area-inset-bottom, 18px) + 64px)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
         <div style={{ flex: 1, minHeight: 0, position: "relative", display: "flex", flexDirection: "column" }}>{body}</div>
       </div>
       <MobileTabBar active={tab} onChange={switchTab} savedCount={savedSet.size}/>
@@ -43979,7 +43979,16 @@ function DirectorsRouter() {
     const root = document.getElementById("root");
     if (isMobile) {
       html.style.overflow = "hidden"; body.style.overflow = "hidden";
-      if (root) root.style.height = "100vh";
+      if (root) {
+        // Fall back to 100vh for old browsers, then upgrade to 100dvh where
+        // supported. 100vh on iOS Safari / Android Chrome reports the largest
+        // possible viewport (browser chrome hidden), which would push the
+        // sticky bottom tab bar below the visible fold when the chrome is up.
+        // 100dvh tracks the visible viewport dynamically and keeps the bar
+        // on-screen.
+        root.style.height = "100vh";
+        root.style.height = "100dvh";
+      }
       body.style.margin = "0"; body.style.padding = "0"; body.style.background = "#F5F7FA";
       body.style.overscrollBehavior = "none";
       body.style.fontFamily = "'Inter Tight', system-ui, sans-serif";
