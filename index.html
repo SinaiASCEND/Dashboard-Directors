@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=1480" />
+  <script>(function(){try{if(window.screen&&window.screen.width<768){var m=document.querySelector('meta[name="viewport"]');if(m)m.setAttribute('content','width=device-width, initial-scale=1, viewport-fit=cover');}}catch(e){}})();</script>
   <title>Curriculum Dashboard — View only</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -262,10 +263,11 @@ hr.sep { border: 0; border-top: 1px solid var(--grey-3); margin: 16px 0; }
   <script src="canonical-aocs.js"></script>
   <script src="jama-nutr-competencies.js"></script>
   <script src="ask-ascend.js"></script>
+  <script src="academic-calendar.js"></script>
 </head>
 <body>
   <div id="root"></div>
-  <script>window.READ_ONLY = true;</script>
+  <script>window.READ_ONLY = true; window.DASHBOARD_LABEL = "Curriculum Dashboard";</script>
   <script>
 
 // ──── real-modules.js ────
@@ -34928,9 +34930,17 @@ function PhaseDot({ phase }) {
 function Topbar({ variantLabel, role, onRoleChange, crumbs = [], roles }) {
   const ROLES = roles || ["Director", "Dean", "Committee"];
   const lens = (typeof window !== "undefined" && window.CURRENT_LENS) || null;
-  const accent = lens?.color || "var(--brand-cyan)";
-  const accentDeep = lens?.deep || "var(--brand-cyan-deep)";
-  const accentTint = lens?.tint || "var(--brand-cyan-tint)";
+  // Directors dashboard uses fuchsia for the topbar accent + wordmark so it's
+  // visually distinct from the student dashboard (which uses brand-cyan).
+  // The fuchsia overrides ONLY when no lens is active (lens accents still
+  // win when the user drills into a specific lens).
+  const IS_DIRECTORS_DASH = typeof window !== "undefined" && window.DASHBOARD_LABEL === "Curriculum Dashboard";
+  const fuchsia      = "#C026D3";
+  const fuchsiaDeep  = "#86198F";
+  const fuchsiaTint  = "#FAE8FF";
+  const accent     = lens?.color || (IS_DIRECTORS_DASH ? fuchsia     : "var(--brand-cyan)");
+  const accentDeep = lens?.deep  || (IS_DIRECTORS_DASH ? fuchsiaDeep : "var(--brand-cyan-deep)");
+  const accentTint = lens?.tint  || (IS_DIRECTORS_DASH ? fuchsiaTint : "var(--brand-cyan-tint)");
   return (
     <div className="topbar" style={{ borderTop: `3px solid ${accent}` }}>
       <div className="logo">
@@ -36841,37 +36851,6 @@ function OverviewA({ setView, setModuleId }) {
         </div>
         <div className="row">
           <button className="btn">Filter</button>
-        </div>
-      </div>
-
-      <div className="grid-12">
-        <div className="card" style={{ gridColumn: "span 3" }}>
-          <div className="kpi">
-            <div className="kpi-label">Curriculum Mean</div>
-            <div className="kpi-value t-num">{(overall.mean * 100).toFixed(1)}<span className="unit">%</span></div>
-            <div className="kpi-delta good">▲ 1.2 pt vs prior cycle</div>
-          </div>
-        </div>
-        <div className="card" style={{ gridColumn: "span 3" }}>
-          <div className="kpi">
-            <div className="kpi-label">Items Flagged</div>
-            <div className="kpi-value t-num">{overall.flagged}</div>
-            <div className="kpi-delta">across 18 modules · review queue</div>
-          </div>
-        </div>
-        <div className="card" style={{ gridColumn: "span 3" }}>
-          <div className="kpi">
-            <div className="kpi-label">Blueprint Coverage</div>
-            <div className="kpi-value t-num">{(overall.cov * 100).toFixed(0)}<span className="unit">%</span></div>
-            <div className="kpi-delta">avg. across MLOs assessable by MCQ</div>
-          </div>
-        </div>
-        <div className="card" style={{ gridColumn: "span 3" }}>
-          <div className="kpi">
-            <div className="kpi-label">Reports Available</div>
-            <div className="kpi-value t-num">{1 + (window.CURRICULUM.REAL ? Object.keys(window.CURRICULUM.REAL).length : 0)}<span className="unit">/18</span></div>
-            <div className="kpi-delta">Anatomy{window.CURRICULUM.REAL && Object.keys(window.CURRICULUM.REAL).length ? ` · +${Object.keys(window.CURRICULUM.REAL).length} ingested` : " · others pending"}</div>
-          </div>
         </div>
       </div>
 
@@ -41216,8 +41195,2739 @@ window.TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
 
 })();
 
+// ──── students/mobile/mobile-app.jsx (auto-routed for narrow viewports) ────
+;(function(){
+// Mobile student dashboard — Direction 2 (brand-forward), functional.
+// Real-data version. Reads from window.ELECTIVES.
+// Phase mapping (terminology): MS3 → Phase 2, MS4 → Phase 3. (Phase 1 = pre-clerkship, no electives.)
 
-ReactDOM.createRoot(document.getElementById("root")).render(<window.AppShell />);
+const { useState: useStateMA, useMemo: useMemoMA, useEffect: useEffectMA, useRef: useRefMA } = React;
+
+// ─── Brand ────────────────────────────────────────────────────
+const BRAND = {
+  cyan:        "#00AEEF",
+  cyanDeep:    "#0086B5",
+  cyanTint:    "#E5F6FE",
+  magenta:     "#D80B8C",
+  magentaDeep: "#A8086C",
+  magentaTint: "#FCE7F1",
+  violet:      "#221F72",
+  violetTint:  "#E8E7F3",
+  ink:         "#0e1a2a",
+  ink2:        "#36404a",
+  grey11:      "#58595B",
+  grey8:       "#8a9099",
+  grey3:       "#d4dae1",
+  grey2:       "#e8ecf1",
+  grey1:       "#f4f6f9",
+  bg:          "#F8F9FB",
+  paper:       "#ffffff",
+};
+
+const SPECIALTY_COLOR = {
+  "Anesthesiology": "#00AEEF",
+  "Surgery": "#D80B8C",
+  "Psychiatry": "#221F72",
+  "Radiology": "#7E57C2",
+  "Neurology": "#0288A8",
+  "Pediatrics": "#EF6C00",
+  "Emergency Medicine": "#C62828",
+  "Emergency Med": "#C62828",
+  "Obstetrics and Gynecology": "#AD1457",
+  "OB/GYN": "#AD1457",
+  "Internal Medicine": "#1565C0",
+  "Family Medicine": "#2E7D32",
+  "Dermatology": "#6A1B9A",
+  "Ophthalmology": "#00838F",
+  "Otolaryngology": "#5D4037",
+  "Orthopedics": "#37474F",
+  "Orthopedic Surgery": "#37474F",
+  "Pathology": "#455A64",
+  "Radiation Oncology": "#558B2F",
+  "Urology": "#1976D2",
+  "Neurosurgery": "#4527A0",
+  "Plastic Surgery": "#C2185B",
+  "Physical Medicine and Rehabilitation": "#00695C",
+  "PM&R": "#00695C",
+};
+const specColor = (s) => SPECIALTY_COLOR[s] || "#58595B";
+
+// Year display: dual-label "M3/Phase 2" + "M4/Phase 3" during the
+// transition from old MS terminology to the triphasic curriculum names.
+function yearToPhases(s) {
+  if (!s) return "—";
+  const has3 = /MS3/.test(s);
+  const has4 = /MS4/.test(s);
+  const has1or2 = /MS1|MS2/.test(s);
+  const parts = [];
+  if (has1or2) parts.push("Phase 1");
+  if (has3) parts.push("M3/Phase 2");
+  if (has4) parts.push("M4/Phase 3");
+  if (!parts.length) return s;
+  return parts.join(" · ");
+}
+// Compact form for tight pills.
+function yearToPhasesShort(s) {
+  if (!s) return "—";
+  const parts = [];
+  if (/MS1|MS2/.test(s)) parts.push("P1");
+  if (/MS3/.test(s)) parts.push("M3/P2");
+  if (/MS4/.test(s)) parts.push("M4/P3");
+  if (!parts.length) return s;
+  return parts.join(" · ");
+}
+function eligibleForPhase(yearStr, phase) {
+  // phase: "all" | "2" | "3"
+  if (phase === "all") return true;
+  if (phase === "2") return /MS3/.test(yearStr || "");
+  if (phase === "3") return /MS4/.test(yearStr || "");
+  return true;
+}
+
+// ─── Icons ────────────────────────────────────────────────────
+const Ico = ({ d, size = 22, stroke = "currentColor", fill = "none", sw = 1.8 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill={fill} stroke={stroke} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round">{d}</svg>
+);
+const IconSearch  = (p) => <Ico {...p} d={<><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></>} />;
+const IconFilter  = (p) => <Ico {...p} d={<><path d="M3 6h18M6 12h12M10 18h4"/></>} />;
+const IconBookmark= (p) => <Ico {...p} d={<path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>} />;
+const IconBookmarkF= (p) => <Ico {...p} d={<path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>} fill="currentColor" sw={1.2}/>;
+const IconCal     = (p) => <Ico {...p} d={<><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></>} />;
+const IconHome    = (p) => <Ico {...p} d={<><path d="M3 11l9-8 9 8"/><path d="M5 9v12h14V9"/></>} />;
+const IconUser    = (p) => <Ico {...p} d={<><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-7 8-7s8 3 8 7"/></>} />;
+const IconMap     = (p) => <Ico {...p} d={<><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/></>} />;
+const IconChevR   = (p) => <Ico {...p} d={<path d="m9 6 6 6-6 6"/>} />;
+const IconChevD   = (p) => <Ico {...p} d={<path d="m6 9 6 6 6-6"/>} />;
+const IconBack    = (p) => <Ico {...p} d={<path d="m15 18-6-6 6-6"/>} />;
+const IconClose   = (p) => <Ico {...p} d={<path d="M18 6 6 18M6 6l12 12"/>} />;
+const IconSort    = (p) => <Ico {...p} d={<><path d="M3 6h18M6 12h12M9 18h6"/></>} />;
+const IconShare   = (p) => <Ico {...p} d={<><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="m16 6-4-4-4 4"/><path d="M12 2v13"/></>} />;
+const IconCheck   = (p) => <Ico {...p} d={<path d="M4 12l5 5L20 6"/>} />;
+const IconBook    = (p) => <Ico {...p} d={<><path d="M4 4v16a2 2 0 0 0 2 2h14V4H6a2 2 0 0 0-2 2v0"/><path d="M9 8h6M9 12h6"/></>} />;
+const IconRefresh = (p) => <Ico {...p} d={<><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></>} />;
+const IconTarget  = (p) => <Ico {...p} d={<><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/></>} />;
+const IconGrid    = (p) => <Ico {...p} d={<><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></>} />;
+
+// ─── Storage helpers ──────────────────────────────────────────
+const SAVED_KEY = "ascend_mobile_saved_v1";
+function loadSaved() {
+  try { return new Set(JSON.parse(localStorage.getItem(SAVED_KEY) || "[]")); }
+  catch { return new Set(); }
+}
+function persistSaved(set) {
+  try { localStorage.setItem(SAVED_KEY, JSON.stringify([...set])); } catch {}
+}
+
+// ─── Tiny shared bits ─────────────────────────────────────────
+function Tag({ children, color, dark }) {
+  const c = color || BRAND.grey11;
+  if (dark) return <div style={{ background: "rgba(255,255,255,0.18)", color: "#fff", padding: "3px 9px", borderRadius: 6, fontSize: 12, fontWeight: 600 }}>{children}</div>;
+  return <div style={{ background: c + "1A", color: c, padding: "3px 9px", borderRadius: 6, fontSize: 12, fontWeight: 600 }}>{children}</div>;
+}
+
+function Segmented({ value, onChange, options }) {
+  return (
+    <div style={{ display: "flex", background: BRAND.grey1, borderRadius: 9, padding: 3, height: 36 }}>
+      {options.map(([val, label]) => {
+        const on = val === value;
+        return (
+          <div key={val} onClick={() => onChange(val)}
+               style={{ flex: 1, display: "grid", placeItems: "center", borderRadius: 6, background: on ? "#fff" : "transparent", boxShadow: on ? "0 1px 3px rgba(0,0,0,.10), 0 1px 1px rgba(0,0,0,.04)" : "none", fontSize: 13, fontWeight: on ? 600 : 500, color: on ? BRAND.ink : BRAND.grey11, cursor: "pointer", transition: "background .15s" }}>
+            {label}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Tab bar ──────────────────────────────────────────────────
+// Directors get a slightly different tab set: Search, Curriculum (browse hub),
+// AOC/Threads (cross-cutting coverage), Saved. Electives + MEPO move into the
+// Curriculum hub. IS_DIRECTORS is detected from the global window.DASHBOARD_LABEL
+// flag set inline above the React mount (so students/directors share one bundle
+// but each opt into a different UX).
+const IS_DIRECTORS = typeof window !== "undefined" && window.DASHBOARD_LABEL === "Curriculum Dashboard";
+const TAB_ACCENT = IS_DIRECTORS ? BRAND.magenta : BRAND.cyan;
+const TAB_ACCENT_TINT = IS_DIRECTORS
+  ? "rgba(216,11,140,0.10)"
+  : BRAND.cyanTint;
+
+// ─── Cross-curriculum coverage helpers (directors) ────────────
+// Compute coverage metrics shared by the MEPO and AOC/Thread tabs. Cached
+// so the React renders stay cheap.
+let __covCache = null;
+function getCoverageMaps() {
+  if (__covCache) return __covCache;
+  const C = window.CURRICULUM || {};
+  const S = window.SESSIONS || {};
+  const modules = C.MODULES || [];
+  // Per-module session totals
+  const modTotals = {};
+  let grandTotal = 0;
+  for (const m of modules) {
+    const pack = S[m.id];
+    const n = pack ? (pack.sessions || []).length : 0;
+    modTotals[m.id] = n;
+    grandTotal += n;
+  }
+  // AOC + thread per-module session counts
+  const aocByMod = { HDS: {}, SSD: {}, LPI: {}, PCA: {} };
+  const aocTotal = { HDS: 0, SSD: 0, LPI: 0, PCA: 0 };
+  const threadByMod = {};
+  const threadTotal = {};
+  for (const t of (window.CANONICAL_THREADS || [])) {
+    threadByMod[t.id] = {};
+    threadTotal[t.id] = 0;
+  }
+  for (const m of modules) {
+    const pack = S[m.id]; if (!pack) continue;
+    for (const s of (pack.sessions || [])) {
+      const aoc = (s.aoc || "").toUpperCase();
+      if (aocByMod[aoc] !== undefined) {
+        aocByMod[aoc][m.id] = (aocByMod[aoc][m.id] || 0) + 1;
+        aocTotal[aoc] += 1;
+      }
+      if (Array.isArray(s.threads)) {
+        for (const tid of s.threads) {
+          if (!threadByMod[tid]) { threadByMod[tid] = {}; threadTotal[tid] = 0; }
+          threadByMod[tid][m.id] = (threadByMod[tid][m.id] || 0) + 1;
+          threadTotal[tid] += 1;
+        }
+      }
+    }
+  }
+  __covCache = { modules, modTotals, grandTotal, aocByMod, aocTotal, threadByMod, threadTotal };
+  return __covCache;
+}
+
+// MEPO coverage: pulls from window.CURRICULUM.MEPO_STATS which is built at
+// data-load time. Returns { sessionCount, moduleCount, modules: [...] }.
+function getMepoCoverage(mepoN) {
+  const s = window.CURRICULUM && window.CURRICULUM.MEPO_STATS && window.CURRICULUM.MEPO_STATS[mepoN];
+  return s || { sessionCount: 0, moduleCount: 0, modules: [] };
+}
+
+// Inline coverage bar — width % of `pct`, brand-tinted track, magenta fill.
+function CovBar({ pct, color, height }) {
+  const w = Math.max(0, Math.min(100, Math.round(pct || 0)));
+  const h = height || 4;
+  const fill = color || BRAND.magenta;
+  return (
+    <div style={{ background: BRAND.grey2, borderRadius: 999, height: h, overflow: "hidden", width: "100%" }}>
+      <div style={{ background: fill, height: "100%", width: w + "%", borderRadius: 999, transition: "width 200ms" }}/>
+    </div>
+  );
+}
+
+// Per-module heatmap row: a grid of small cells, one per module, colored by
+// density (fraction of that module's sessions tagged with this MEPO/AOC/thread).
+function ModuleHeatmapRow({ counts, color }) {
+  const cov = getCoverageMaps();
+  const mods = cov.modules;
+  const accent = color || BRAND.magenta;
+  return (
+    <div style={{ display: "flex", gap: 3, flexWrap: "wrap" }}>
+      {mods.map((m) => {
+        const total = cov.modTotals[m.id] || 0;
+        const hit = (counts && counts[m.id]) || 0;
+        const pct = total ? hit / total : 0;
+        // alpha 0.08 (no hits) → 1.0 (everything)
+        const a = hit === 0 ? 0.08 : Math.max(0.25, pct);
+        const bg = hexWithAlpha(accent, a);
+        return (
+          <div key={m.id} title={`${m.short || m.name} · ${hit}/${total}`}
+            style={{ background: bg, color: a > 0.55 ? "#fff" : BRAND.ink, fontSize: 9, fontWeight: 700, padding: "3px 6px", borderRadius: 4, letterSpacing: 0.2, lineHeight: 1.2 }}>
+            {m.short || m.id}
+            {hit > 0 && <span style={{ marginLeft: 3, opacity: 0.8, fontWeight: 600 }}>{hit}</span>}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+function hexWithAlpha(hex, a) {
+  // Accepts #RRGGBB or named brand color (already #RRGGBB).
+  const m = (hex || "").match(/^#?([a-f0-9]{6})$/i);
+  if (!m) return hex;
+  const r = parseInt(m[1].slice(0, 2), 16);
+  const g = parseInt(m[1].slice(2, 4), 16);
+  const b = parseInt(m[1].slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${a.toFixed(2)})`;
+}
+
+function MobileTabBar({ active, onChange, savedCount }) {
+  const items = IS_DIRECTORS ? [
+    { id: "search",    label: "ASCEND",     icon: IconSearch },
+    { id: "aocthreads", label: "AOC/Threads", icon: IconBook },
+    { id: "mepo",      label: "MEPOs",      icon: IconTarget },
+    { id: "calendar",  label: "Calendar",   icon: IconCal },
+  ] : [
+    { id: "search",    label: "ASCEND",   icon: IconSearch },
+    { id: "electives", label: "Electives", icon: IconBook },
+    { id: "mepo",      label: "CA/MEPO",  icon: IconTarget },
+    { id: "saved",     label: "Saved",    icon: IconBookmark, badge: savedCount },
+  ];
+  return (
+    <div style={{ background: "#fff", borderTop: "1px solid " + BRAND.grey2, paddingBottom: "max(env(safe-area-inset-bottom, 18px), 18px)", position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 50, boxShadow: "0 -1px 0 " + BRAND.grey2 }}>
+      <div style={{ display: "flex", padding: "8px 4px 4px" }}>
+        {items.map((it) => {
+          const on = it.id === active;
+          return (
+            <button key={it.id} onClick={() => onChange(it.id)}
+                    style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4, padding: "4px 0", border: "none", background: "transparent", cursor: "pointer", position: "relative" }}>
+              <div style={{ background: on ? TAB_ACCENT_TINT : "transparent", padding: "4px 18px", borderRadius: 999, position: "relative" }}>
+                <it.icon size={22} stroke={on ? TAB_ACCENT : BRAND.grey11} sw={on ? 2.2 : 1.8}/>
+                {it.badge ? (
+                  <div style={{ position: "absolute", top: -2, right: 8, background: BRAND.magenta, color: "#fff", borderRadius: 999, minWidth: 16, height: 16, padding: "0 4px", fontSize: 10, fontWeight: 700, display: "grid", placeItems: "center", border: "2px solid #fff" }}>{it.badge}</div>
+                ) : null}
+              </div>
+              <div style={{ fontSize: 11, color: on ? TAB_ACCENT : BRAND.grey11, fontWeight: on ? 600 : 500 }}>{it.label}</div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── AOC / Threads (mobile, directors only) ────────────────────
+// Hub of all 4 AOCs and 8 canonical threads with coverage %. Tap any tile
+// for a per-module heatmap + session list.
+function MobileAocThreadsTab({ onOpenSession }) {
+  const sans = "'Inter Tight', system-ui, sans-serif";
+  const [picked, setPicked] = useStateMA(null); // { kind: "aoc"|"thread", id, label }
+  const cov = getCoverageMaps();
+  const AOC_INFO = [
+    { code: "HDS", label: "Healthcare Delivery Science",            color: BRAND.cyanDeep },
+    { code: "SSD", label: "Scientific & Scholarly Discovery",       color: BRAND.violet },
+    { code: "LPI", label: "Leadership & Professional Identity",     color: BRAND.magenta },
+    { code: "PCA", label: "Patient-Centered Advocacy",              color: "#1F8A5B" },
+  ];
+  const threads = (window.CANONICAL_THREADS || []).slice().sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+
+  // Detail page for a chosen tag
+  if (picked) {
+    return <AocThreadDetail picked={picked} onBack={() => setPicked(null)} onOpenSession={onOpenSession}/>;
+  }
+
+  // Hub: show AOCs section then Threads section
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", background: BRAND.bg, fontFamily: sans, color: BRAND.ink, overflow: "hidden" }}>
+      <div style={{ background: IS_DIRECTORS ? "#C026D3" : BRAND.cyan, color: "#fff", paddingTop: "max(env(safe-area-inset-top, 12px), 12px)", paddingBottom: 18 }}>
+        <div style={{ padding: "10px 16px 4px", display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ width: 10, height: 10, borderRadius: 2, background: "#fff" }}/>
+          <div style={{ fontSize: 19, fontWeight: 600, letterSpacing: -0.2 }}>AOC / Threads</div>
+        </div>
+        <div style={{ padding: "0 16px", fontSize: 13, opacity: 0.9, marginTop: 4 }}>
+          Cross-cutting coverage across Phase 1
+        </div>
+      </div>
+      <div style={{ flex: 1, overflowY: "auto", padding: "14px 14px 18px", WebkitOverflowScrolling: "touch" }}>
+        {/* AOCs */}
+        <div style={{ fontSize: 11, color: BRAND.grey11, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700, padding: "4px 4px 8px" }}>
+          Areas of Concentration · {AOC_INFO.length}
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 18 }}>
+          {AOC_INFO.map((a) => {
+            const total = cov.aocTotal[a.code] || 0;
+            const pct = cov.grandTotal ? (total / cov.grandTotal) * 100 : 0;
+            return (
+              <button key={a.code} onClick={() => setPicked({ kind: "aoc", id: a.code, label: a.label, color: a.color })}
+                style={{ background: "#fff", border: "1px solid " + BRAND.grey2, borderRadius: 12, padding: "12px 12px", textAlign: "left", cursor: "pointer", fontFamily: "inherit", boxShadow: "0 1px 2px rgba(0,0,0,0.04)", display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                  <div style={{ fontFamily: "'JetBrains Mono', ui-monospace, monospace", fontSize: 11, color: a.color, fontWeight: 700, letterSpacing: 0.3 }}>{a.code}</div>
+                  <div style={{ fontSize: 11, color: BRAND.grey11, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{pct.toFixed(1)}%</div>
+                </div>
+                <div style={{ fontSize: 12.5, color: BRAND.ink, fontWeight: 600, lineHeight: 1.3, minHeight: 32 }}>{a.label}</div>
+                <CovBar pct={pct} color={a.color}/>
+                <div style={{ fontSize: 11, color: BRAND.grey11 }}>{total} session{total === 1 ? "" : "s"}</div>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Threads */}
+        <div style={{ fontSize: 11, color: BRAND.grey11, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700, padding: "4px 4px 8px" }}>
+          Curricular Threads · {threads.length}
+        </div>
+        <div style={{ background: "#fff", borderRadius: 12, overflow: "hidden", boxShadow: "0 1px 2px rgba(0,0,0,0.04)" }}>
+          {threads.map((t, i) => {
+            const total = cov.threadTotal[t.id] || 0;
+            const pct = cov.grandTotal ? (total / cov.grandTotal) * 100 : 0;
+            return (
+              <button key={t.id} onClick={() => setPicked({ kind: "thread", id: t.id, label: t.name, color: BRAND.cyanDeep })}
+                style={{ display: "flex", flexDirection: "column", gap: 6, padding: "12px 14px", border: "none", background: "transparent", borderTop: i === 0 ? "none" : "1px solid " + BRAND.grey2, textAlign: "left", cursor: "pointer", width: "100%", fontFamily: "inherit", WebkitTapHighlightColor: "rgba(0,0,0,0.06)" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{ flex: 1, fontSize: 14, fontWeight: 600, color: BRAND.ink }}>{t.name}</div>
+                  <div style={{ fontSize: 11, color: BRAND.grey11, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{total} · {pct.toFixed(1)}%</div>
+                  <IconChevR size={14} stroke={BRAND.grey3} sw={2}/>
+                </div>
+                <CovBar pct={pct} color={BRAND.cyanDeep}/>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// AOC/Thread detail: shows summary, module heatmap, and the session list.
+function AocThreadDetail({ picked, onBack, onOpenSession }) {
+  const sans = "'Inter Tight', system-ui, sans-serif";
+  const cov = getCoverageMaps();
+  const C = window.CURRICULUM || {};
+  const S = window.SESSIONS || {};
+  const modById = {};
+  for (const m of (C.MODULES || [])) modById[m.id] = m;
+
+  // Build counts + session list
+  let counts = {};
+  let sessions = [];
+  if (picked.kind === "aoc") {
+    counts = cov.aocByMod[picked.id] || {};
+    for (const m of (C.MODULES || [])) {
+      const pack = S[m.id]; if (!pack) continue;
+      for (const s of (pack.sessions || [])) {
+        if ((s.aoc || "").toUpperCase() === picked.id) {
+          sessions.push({ mod: m, session: s });
+        }
+      }
+    }
+  } else {
+    counts = cov.threadByMod[picked.id] || {};
+    const def = (window.CANONICAL_THREADS || []).find((t) => t.id === picked.id);
+    if (def) {
+      for (const tag of (def.sessions || [])) {
+        const mod = modById[tag.modId]; if (!mod) continue;
+        const pack = S[mod.id]; if (!pack) continue;
+        const sess = (pack.sessions || []).find((s) => s.n === tag.n);
+        if (sess) sessions.push({ mod, session: sess });
+      }
+    }
+  }
+  // Sort sessions by module name then session title
+  sessions.sort((a, b) => (a.mod.name || "").localeCompare(b.mod.name || "") || (a.session.title || "").localeCompare(b.session.title || ""));
+  const total = sessions.length;
+  const pct = cov.grandTotal ? (total / cov.grandTotal) * 100 : 0;
+  const moduleCount = Object.keys(counts).length;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", background: BRAND.bg, fontFamily: sans, color: BRAND.ink, overflow: "hidden" }}>
+      <div style={{ background: picked.color || BRAND.cyanDeep, color: "#fff", paddingTop: "max(env(safe-area-inset-top, 12px), 12px)", paddingBottom: 16, borderBottom: "3px solid " + BRAND.magenta }}>
+        <div style={{ padding: "10px 8px 6px", display: "flex", alignItems: "center", gap: 4 }}>
+          <button onClick={onBack} style={{ background: "transparent", border: "none", padding: 8, color: "#fff", cursor: "pointer", display: "grid", placeItems: "center", WebkitTapHighlightColor: "rgba(255,255,255,0.2)" }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", opacity: 0.9 }}>
+            {picked.kind === "aoc" ? "Area of Concentration" : "Curricular Thread"}
+          </div>
+        </div>
+        <div style={{ padding: "0 16px" }}>
+          <div style={{ fontSize: 20, fontWeight: 600, lineHeight: 1.25 }}>{picked.label}</div>
+          <div style={{ marginTop: 8, display: "flex", alignItems: "baseline", gap: 8 }}>
+            <div style={{ fontSize: 28, fontWeight: 700, lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>{pct.toFixed(1)}%</div>
+            <div style={{ fontSize: 12.5, opacity: 0.9 }}>· {total} session{total === 1 ? "" : "s"} across {moduleCount} module{moduleCount === 1 ? "" : "s"}</div>
+          </div>
+          <div style={{ marginTop: 10 }}>
+            <CovBar pct={pct} color="#fff" height={5}/>
+          </div>
+        </div>
+      </div>
+      <div style={{ flex: 1, overflowY: "auto", padding: "14px 14px 18px", WebkitOverflowScrolling: "touch" }}>
+        <div style={{ background: "#fff", borderRadius: 12, padding: "14px 14px", marginBottom: 14, boxShadow: "0 1px 2px rgba(0,0,0,0.04)" }}>
+          <div style={{ fontSize: 10.5, color: BRAND.grey11, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", marginBottom: 8 }}>Module heatmap</div>
+          <ModuleHeatmapRow counts={counts} color={picked.color || BRAND.cyanDeep}/>
+        </div>
+        <div style={{ fontSize: 11, color: BRAND.grey11, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", padding: "4px 4px 8px" }}>
+          Sessions · {sessions.length}
+        </div>
+        {sessions.length === 0 ? (
+          <div style={{ background: "#fff", borderRadius: 12, padding: "30px 22px", textAlign: "center", color: BRAND.grey11 }}>
+            No sessions tagged yet.
+          </div>
+        ) : (
+          <div style={{ background: "#fff", borderRadius: 12, overflow: "hidden", boxShadow: "0 1px 2px rgba(0,0,0,0.04)" }}>
+            {sessions.map((r, i) => {
+              // Build the item shape SearchResultDetail / SessionDetailBody expects.
+              const slos = (r.session.objectives && r.session.objectives.length)
+                ? r.session.objectives.map((o) => o.text || o.slo).filter(Boolean)
+                : (r.session.slos || []).filter(Boolean);
+              const item = {
+                kind: "Session", id: r.session.id,
+                title: r.session.title,
+                sub: `${r.mod.short || r.mod.id}${r.session.week ? " · Week " + r.session.week : ""}${r.session.type ? " · " + r.session.type : ""}`,
+                meta: r.session.duration ? r.session.duration + " min" : "",
+                session: r.session, moduleId: r.mod.id, moduleShort: r.mod.short || r.mod.id, slos,
+              };
+              return (
+              <button key={r.mod.id + ":" + (r.session.n || i)} onClick={() => onOpenSession && onOpenSession(item)}
+                style={{ display: "flex", flexDirection: "column", gap: 3, padding: "11px 14px", border: "none", background: "transparent", borderTop: i === 0 ? "none" : "1px solid " + BRAND.grey2, textAlign: "left", cursor: "pointer", width: "100%", fontFamily: "inherit", WebkitTapHighlightColor: "rgba(0,0,0,0.06)" }}>
+                <div style={{ fontSize: 10.5, color: BRAND.grey11, fontWeight: 600, letterSpacing: 0.4, textTransform: "uppercase" }}>
+                  {r.mod.short || r.mod.name}{r.session.week ? " · Wk " + r.session.week : ""}
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ flex: 1, fontSize: 13.5, fontWeight: 600, color: BRAND.sessionTitle || "#0B3B7A", lineHeight: 1.3 }}>{r.session.title}</div>
+                  <IconChevR size={14} stroke={BRAND.grey3} sw={2}/>
+                </div>
+              </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Leadership Directory (mobile, directors only) ────────────
+// Renders the curated leadership directory (window.CA_DIRECTORY) as a
+// phone-friendly grouped list. Search filters across name, role, section.
+function MobileCalendarTab() {
+  const sans = "'Inter Tight', system-ui, sans-serif";
+  const all = (typeof window !== "undefined" && window.ASCEND_CALENDAR_2026_27) || [];
+  const CLASS_OPTIONS = [
+    { id: "all", label: "All classes" },
+    { id: "M1",  label: "Class of 2030 (M1)" },
+    { id: "M2",  label: "Class of 2029 (M2)" },
+    { id: "M3",  label: "Class of 2028 (M3)" },
+    { id: "M4",  label: "Class of 2027 (M4)" },
+  ];
+  const [classFilter, setClassFilter] = useStateMA("all");
+  const KIND_COLOR = {
+    module:     { bg: "rgba(0,174,239,0.10)",   chip: BRAND.cyanDeep,    label: "Module" },
+    exam:       { bg: "rgba(184,43,30,0.10)",   chip: BRAND.bad,         label: "Exam" },
+    osce:       { bg: "rgba(34,31,114,0.10)",   chip: BRAND.violet,      label: "OSCE" },
+    holiday:    { bg: "rgba(88,89,91,0.08)",    chip: BRAND.grey11,      label: "Holiday" },
+    break:      { bg: "rgba(31,138,75,0.10)",   chip: "#1F8A4C",         label: "Break" },
+    ceremony:   { bg: "rgba(216,11,140,0.10)",  chip: BRAND.magenta,     label: "Ceremony" },
+    transition: { bg: "rgba(192,38,211,0.10)",  chip: "#C026D3",         label: "Transition" },
+    block:      { bg: "rgba(0,140,192,0.10)",   chip: BRAND.cyanDeep,    label: "Block" },
+    other:      { bg: "rgba(88,89,91,0.08)",    chip: BRAND.grey11,      label: "" },
+  };
+  // Filter
+  const filtered = useMemoMA(() => {
+    if (classFilter === "all") return all;
+    return all.filter((e) => e.className === classFilter);
+  }, [all, classFilter]);
+  // Group by month
+  const byMonth = useMemoMA(() => {
+    const m = new Map();
+    for (const e of filtered) {
+      const monthKey = e.date.slice(0, 7); // "2026-08"
+      if (!m.has(monthKey)) m.set(monthKey, []);
+      m.get(monthKey).push(e);
+    }
+    return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  }, [filtered]);
+
+  function fmtMonth(key) {
+    const [y, mo] = key.split("-").map(Number);
+    return new Date(y, mo - 1, 1).toLocaleString(undefined, { month: "long", year: "numeric" });
+  }
+  function fmtDate(iso) {
+    const [y, mo, d] = iso.split("-").map(Number);
+    const dt = new Date(y, mo - 1, d);
+    return { day: d, wd: dt.toLocaleString(undefined, { weekday: "short" }) };
+  }
+  function fmtRange(start, end) {
+    if (!end || end === start) return "";
+    const a = fmtDate(start), b = fmtDate(end);
+    return ` → ${b.day}`;
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", background: BRAND.bg, fontFamily: sans, color: BRAND.ink, overflow: "hidden" }}>
+      {/* App bar */}
+      <div style={{ background: IS_DIRECTORS ? "#C026D3" : BRAND.cyan, color: "#fff", paddingTop: "max(env(safe-area-inset-top, 12px), 12px)", paddingBottom: 14 }}>
+        <div style={{ padding: "10px 16px 8px", display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ width: 10, height: 10, borderRadius: 2, background: "#fff" }}/>
+          <div style={{ fontSize: 19, fontWeight: 600, letterSpacing: -0.2 }}>Academic Calendar</div>
+        </div>
+        <div style={{ padding: "0 16px", fontSize: 12.5, opacity: 0.9, marginBottom: 8 }}>AY 2026–27 · ISMMS MD Program</div>
+        {/* Class chips */}
+        <div style={{ padding: "0 12px", display: "flex", gap: 5, overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+          {CLASS_OPTIONS.map((c) => {
+            const on = classFilter === c.id;
+            return (
+              <button key={c.id} onClick={() => setClassFilter(c.id)}
+                style={{
+                  flex: "0 0 auto", fontSize: 11.5, fontWeight: 600, padding: "5px 11px", borderRadius: 999,
+                  border: "1px solid " + (on ? "#fff" : "rgba(255,255,255,0.5)"),
+                  background: on ? "#fff" : "transparent",
+                  color: on ? (IS_DIRECTORS ? "#C026D3" : BRAND.cyanDeep) : "#fff",
+                  cursor: "pointer", letterSpacing: 0.04, fontFamily: sans, whiteSpace: "nowrap",
+                }}>{c.label}</button>
+            );
+          })}
+        </div>
+      </div>
+      {/* Body */}
+      <div style={{ flex: 1, overflowY: "auto", padding: "14px 14px 18px", WebkitOverflowScrolling: "touch" }}>
+        {byMonth.length === 0 && (
+          <div style={{ background: "#fff", borderRadius: 12, padding: "30px 22px", textAlign: "center", color: BRAND.grey11 }}>
+            No events for this filter.
+          </div>
+        )}
+        {byMonth.map(([monthKey, events]) => (
+          <div key={monthKey} style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 11, color: BRAND.grey11, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700, padding: "4px 4px 8px", display: "flex", alignItems: "baseline", gap: 8 }}>
+              <span>{fmtMonth(monthKey)}</span>
+              <span style={{ color: BRAND.grey7, fontWeight: 600 }}>· {events.length}</span>
+            </div>
+            <div style={{ background: "#fff", borderRadius: 12, overflow: "hidden", boxShadow: "0 1px 2px rgba(0,0,0,0.04)" }}>
+              {events.map((ev, i) => {
+                const d = fmtDate(ev.date);
+                const range = fmtRange(ev.date, ev.end);
+                const k = KIND_COLOR[ev.kind] || KIND_COLOR.other;
+                return (
+                  <div key={ev.date + ":" + ev.label + ":" + i} style={{
+                    display: "flex", alignItems: "stretch", gap: 0, borderTop: i === 0 ? "none" : "1px solid " + BRAND.grey2,
+                  }}>
+                    {/* Date column */}
+                    <div style={{
+                      flex: "0 0 56px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                      padding: "10px 4px", background: k.bg, borderRight: "1px solid " + BRAND.grey2,
+                    }}>
+                      <div style={{ fontSize: 22, fontWeight: 700, color: k.chip, lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>{d.day}</div>
+                      <div style={{ fontSize: 9.5, color: k.chip, fontWeight: 700, letterSpacing: 0.4, textTransform: "uppercase", marginTop: 2 }}>{d.wd}</div>
+                      {range && <div style={{ fontSize: 9, color: BRAND.grey11, marginTop: 3, fontWeight: 600 }}>{range}</div>}
+                    </div>
+                    {/* Content */}
+                    <div style={{ flex: 1, padding: "11px 12px", minWidth: 0 }}>
+                      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 5, marginBottom: 4 }}>
+                        {k.label && (
+                          <span style={{ fontSize: 9, color: "#fff", background: k.chip, fontWeight: 700, letterSpacing: 0.4, textTransform: "uppercase", padding: "2px 6px", borderRadius: 3 }}>
+                            {k.label}
+                          </span>
+                        )}
+                        {ev.restricted && (
+                          <span title="Restricted date — no planned absences"
+                            style={{ fontSize: 9, color: BRAND.bad, background: "rgba(184,43,30,0.10)", fontWeight: 700, letterSpacing: 0.4, textTransform: "uppercase", padding: "2px 6px", borderRadius: 3 }}>
+                            Restricted
+                          </span>
+                        )}
+                        {ev.className && classFilter === "all" && (
+                          <span style={{ fontSize: 9.5, color: BRAND.grey11, fontWeight: 700, letterSpacing: 0.4 }}>
+                            {ev.className}
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: 13.5, color: BRAND.ink, lineHeight: 1.35, fontWeight: 600 }}>{ev.label}</div>
+                      {ev.section && (
+                        <div style={{ fontSize: 11, color: BRAND.grey11, marginTop: 3, fontStyle: "italic" }}>{ev.section}</div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+        {/* Legend */}
+        <div style={{ background: "#fff", borderRadius: 12, padding: "12px 14px", marginTop: 4, boxShadow: "0 1px 2px rgba(0,0,0,0.04)" }}>
+          <div style={{ fontSize: 10.5, color: BRAND.grey11, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", marginBottom: 8 }}>Legend</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {Object.entries(KIND_COLOR).filter(([k, v]) => v.label).map(([k, v]) => (
+              <div key={k} style={{ fontSize: 11, color: BRAND.ink2, background: v.bg, padding: "2px 8px", borderRadius: 6, fontWeight: 600 }}>
+                <span style={{ color: v.chip, fontWeight: 700, marginRight: 4 }}>●</span>
+                {v.label}
+              </div>
+            ))}
+            <div style={{ fontSize: 11, color: BRAND.bad, background: "rgba(184,43,30,0.10)", padding: "2px 8px", borderRadius: 6, fontWeight: 700 }}>
+              ★ Restricted = no planned absences
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Leadership Directory (mobile, directors only) ────────────
+// Renders the curated leadership directory (window.CA_DIRECTORY) as a
+// phone-friendly grouped list. Search filters across name, role, section.
+function MobileDirectoryTab() {
+  const directory = (typeof window !== "undefined" && window.CA_DIRECTORY) || [];
+  const [q, setQ] = useStateMA("");
+  const tokens = q.toLowerCase().split(/\s+/).filter(Boolean);
+  const matchesPerson = (p, section) => {
+    if (tokens.length === 0) return true;
+    const hay = ((p.name || "") + " " + (p.role || "") + " " + (p.email || "") + " " + (section || "")).toLowerCase();
+    return tokens.every((t) => hay.includes(t));
+  };
+  const filtered = directory.map((sec) => ({
+    section: sec.section,
+    members: (sec.members || []).filter((p) => matchesPerson(p, sec.section)),
+  })).filter((sec) => sec.members.length > 0);
+  const total = filtered.reduce((n, s) => n + s.members.length, 0);
+  const sans = "'Inter Tight', system-ui, sans-serif";
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", background: BRAND.bg, fontFamily: sans, color: BRAND.ink, overflow: "hidden" }}>
+      <div style={{ background: IS_DIRECTORS ? "#C026D3" : BRAND.cyan, color: "#fff", paddingTop: "max(env(safe-area-inset-top, 12px), 12px)", paddingBottom: 14 }}>
+        <div style={{ padding: "10px 16px 12px", display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ width: 10, height: 10, borderRadius: 2, background: "#fff" }}/>
+          <div style={{ fontSize: 19, fontWeight: 600, letterSpacing: -0.2 }}>Leadership Directory</div>
+        </div>
+        <div style={{ padding: "0 14px" }}>
+          <div style={{ background: "rgba(255,255,255,0.97)", borderRadius: 12, padding: "11px 14px", display: "flex", alignItems: "center", gap: 10, boxShadow: "0 1px 6px rgba(0,0,0,0.05)" }}>
+            <IconSearch size={18} stroke={BRAND.grey11} sw={2}/>
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by name, role, or AOC" autoCorrect="off" autoCapitalize="off"
+              style={{ flex: 1, border: "none", outline: "none", background: "transparent", fontSize: 15, fontFamily: sans, color: BRAND.ink, minWidth: 0 }}/>
+            {q ? (
+              <button onClick={() => setQ("")} style={{ background: "transparent", border: "none", padding: 0, color: BRAND.grey11, cursor: "pointer", display: "grid", placeItems: "center" }}>
+                <IconClose size={16} stroke={BRAND.grey11} sw={2}/>
+              </button>
+            ) : null}
+          </div>
+        </div>
+      </div>
+      <div style={{ flex: 1, overflowY: "auto", padding: "14px 14px 16px", WebkitOverflowScrolling: "touch" }}>
+        {q && (
+          <div style={{ fontSize: 12, color: BRAND.grey11, marginBottom: 10, padding: "0 4px" }}>
+            {total} match{total === 1 ? "" : "es"}
+          </div>
+        )}
+        {filtered.length === 0 ? (
+          <div style={{ background: "#fff", borderRadius: 12, padding: "30px 22px", textAlign: "center", color: BRAND.grey11, fontSize: 13 }}>
+            No people matched “{q}”.
+          </div>
+        ) : (
+          filtered.map((sec) => (
+            <div key={sec.section} style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 10.5, color: BRAND.magenta, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", padding: "0 4px 6px" }}>
+                {sec.section} · {sec.members.length}
+              </div>
+              <div style={{ background: "#fff", borderRadius: 12, overflow: "hidden", boxShadow: "0 1px 2px rgba(0,0,0,0.04)" }}>
+                {sec.members.map((p, i) => (
+                  <div key={p.name + i} style={{ padding: "12px 14px", borderTop: i === 0 ? "none" : "1px solid " + BRAND.grey2 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: BRAND.ink, lineHeight: 1.3 }}>{p.name}</div>
+                    {p.role && <div style={{ fontSize: 12, color: BRAND.ink2, marginTop: 3, lineHeight: 1.4 }}>{p.role}</div>}
+                    {p.email && (
+                      <a href={`mailto:${p.email}`} style={{ display: "inline-block", marginTop: 6, fontSize: 11.5, color: BRAND.cyanDeep, textDecoration: "none", fontWeight: 600 }}>{p.email}</a>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))
+        )}
+        {/* Continue in desktop link */}
+        <div style={{ marginTop: 8, padding: "12px 14px", background: "#fff", borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+          <div style={{ fontSize: 12, color: BRAND.grey11, lineHeight: 1.4 }}>
+            Full Office of Curricular Affairs view, with bios and committee assignments, is on desktop.
+          </div>
+          <a href="?view=desktop" style={{ flex: "0 0 auto", fontSize: 11.5, fontWeight: 700, padding: "7px 11px", borderRadius: 6, background: BRAND.magenta, color: "#fff", textDecoration: "none", letterSpacing: "0.04em", whiteSpace: "nowrap" }}>OPEN DESKTOP</a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Electives list ───────────────────────────────────────────
+function ElectivesList({ onOpen, onOpenFilters, savedSet, onToggleSave }) {
+  const all = window.ELECTIVES || [];
+  const [q, setQ] = useStateMA("");
+  const [phase, setPhase] = useStateMA("all"); // 'all' | '2' | '3'
+  const [sortBy, setSortBy] = useStateMA("relevance");
+  const [filters, setFilters] = useStateMA({
+    specialty: "All", type: "All", duration: "All", setting: "All",
+    intensity: "All", audition: "All", site: "All",
+  });
+  // Ask-ASCEND state, scoped strictly to electives.
+  const [askQuery, setAskQuery] = useStateMA("");
+  const [askLoading, setAskLoading] = useStateMA(false);
+  const [askResult, setAskResult] = useStateMA(null);
+  const [askError, setAskError] = useStateMA(null);
+  async function runAsk() {
+    const text = (q || "").trim();
+    if (!text) return;
+    if (!window.AskAscend || !window.AskAscend.askElectives) {
+      setAskError("Ask ASCEND not available.");
+      return;
+    }
+    setAskQuery(text); setAskLoading(true); setAskError(null); setAskResult(null);
+    try {
+      const res = await window.AskAscend.askElectives(text);
+      setAskResult(res);
+    } catch (e) {
+      setAskError(String(e && e.message ? e.message : e));
+    } finally {
+      setAskLoading(false);
+    }
+  }
+  function clearAsk() {
+    setQ(""); setAskQuery(""); setAskResult(null); setAskError(null);
+  }
+
+  // Bridge for filter sheet → list state
+  useEffectMA(() => { window.__mobileFilters = { filters, setFilters }; }, [filters]);
+
+  const activeFilterCount = Object.values(filters).filter((v) => v !== "All").length;
+
+  const filtered = useMemoMA(() => {
+    const tokens = q.toLowerCase().split(/\s+/).filter(Boolean);
+    const inSplit = (val, target, split) => {
+      if (target === "All") return true;
+      if (!val) return false;
+      if (split) return val.split(split).map((x) => x.trim()).includes(target);
+      return val === target;
+    };
+    let list = all.filter((e) => {
+      if (!eligibleForPhase(e.yearEligibility, phase)) return false;
+      if (tokens.length) {
+        const hay = [e.code, e.title, e.specialty, e.type, e.keywords, e.residencyTracks, e.sites, e.clinicalSetting, e.intensity].join(" ").toLowerCase();
+        if (!tokens.every((t) => hay.includes(t))) return false;
+      }
+      if (!inSplit(e.specialty, filters.specialty)) return false;
+      if (!inSplit(e.type, filters.type)) return false;
+      if (!inSplit(e.clinicalSetting, filters.setting)) return false;
+      if (!inSplit(e.intensity, filters.intensity)) return false;
+      if (!inSplit(e.audition, filters.audition)) return false;
+      if (!inSplit(e.sites, filters.site, ";")) return false;
+      if (filters.duration !== "All") {
+        const wantWeeks = parseInt(filters.duration);
+        const has = (e.durationOptions || "").split(",").map((p) => parseInt(p.trim())).filter((n) => !isNaN(n));
+        if (!has.includes(wantWeeks)) return false;
+      }
+      return true;
+    });
+    if (sortBy === "title") list = [...list].sort((a, b) => a.title.localeCompare(b.title));
+    else if (sortBy === "code") list = [...list].sort((a, b) => a.code.localeCompare(b.code));
+    else if (sortBy === "specialty") list = [...list].sort((a, b) => (a.specialty || "").localeCompare(b.specialty || "") || a.title.localeCompare(b.title));
+    return list;
+  }, [all, q, phase, filters, sortBy]);
+
+  function clearAll() {
+    setQ(""); setPhase("all");
+    setFilters({ specialty: "All", type: "All", duration: "All", setting: "All", intensity: "All", audition: "All", site: "All" });
+  }
+
+  const sans = "'Inter Tight', system-ui, sans-serif";
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", background: BRAND.bg, fontFamily: sans, color: BRAND.ink, overflow: "hidden" }}>
+      {/* Cyan app bar */}
+      <div style={{ background: IS_DIRECTORS ? "#C026D3" : BRAND.cyan, color: "#fff", paddingTop: "max(env(safe-area-inset-top, 12px), 12px)", paddingBottom: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 16px 12px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ width: 10, height: 10, borderRadius: 2, background: "#fff" }}/>
+            <div style={{ fontSize: 19, fontWeight: 600, letterSpacing: -0.2 }}>Electives Catalog</div>
+          </div>
+          <button onClick={() => alert("Profile (stub)")} style={{ width: 36, height: 36, borderRadius: 999, background: "rgba(255,255,255,0.18)", border: "none", color: "#fff", display: "grid", placeItems: "center", cursor: "pointer" }}>
+            <IconUser size={20} stroke="#fff" sw={2}/>
+          </button>
+        </div>
+        {/* Search */}
+        <div style={{ padding: "0 14px" }}>
+          <div style={{ background: "rgba(255,255,255,0.97)", borderRadius: 12, padding: "11px 14px", display: "flex", alignItems: "center", gap: 10, boxShadow: "0 1px 6px rgba(0,0,0,0.05)" }}>
+            <IconSearch size={18} stroke={BRAND.grey11} sw={2}/>
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search electives, code, track" autoCorrect="off" autoCapitalize="off"
+              style={{ flex: 1, border: "none", outline: "none", background: "transparent", fontSize: 15, fontFamily: sans, color: BRAND.ink, minWidth: 0 }}/>
+            {q ? (
+              <button onClick={() => setQ("")} style={{ background: "transparent", border: "none", padding: 0, color: BRAND.grey11, cursor: "pointer", display: "grid", placeItems: "center" }}>
+                <IconClose size={16} stroke={BRAND.grey11} sw={2}/>
+              </button>
+            ) : null}
+            <div style={{ width: 1, height: 18, background: BRAND.grey2 }}/>
+            <button onClick={onOpenFilters} style={{ background: "transparent", border: "none", padding: 0, color: BRAND.cyan, cursor: "pointer", display: "flex", alignItems: "center", gap: 4, position: "relative" }}>
+              <IconFilter size={18} stroke={BRAND.cyan} sw={2.2}/>
+              {activeFilterCount > 0 && <div style={{ position: "absolute", top: -4, right: -8, background: BRAND.magenta, color: "#fff", borderRadius: 999, minWidth: 16, height: 16, padding: "0 4px", fontSize: 10, fontWeight: 700, display: "grid", placeItems: "center", border: "2px solid #fff" }}>{activeFilterCount}</div>}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Phase segmented control */}
+      <div style={{ padding: "10px 14px 6px", background: "#fff", borderBottom: "1px solid " + BRAND.grey2 }}>
+        <Segmented value={phase} onChange={setPhase} options={[["all", "All"], ["2", "M3 · P2"], ["3", "M4 · P3"]]}/>
+      </div>
+
+      {/* Filter chip ribbon */}
+      <FilterChips filters={filters} setFilters={setFilters} onOpenFilters={onOpenFilters}/>
+
+      {/* Active filter chips (removable) */}
+      {(activeFilterCount > 0 || q) && (
+        <div style={{ background: "#fff", borderBottom: "1px solid " + BRAND.grey2, padding: "6px 14px 10px", display: "flex", gap: 6, overflowX: "auto", flexWrap: "wrap" }}>
+          {q && <RemovableChip label={`"${q}"`} onRemove={() => setQ("")}/>}
+          {Object.entries(filters).map(([k, v]) => v !== "All" && <RemovableChip key={k} label={v} onRemove={() => setFilters({ ...filters, [k]: "All" })}/>)}
+          {(activeFilterCount + (q ? 1 : 0)) > 1 && (
+            <button onClick={clearAll} style={{ marginLeft: "auto", background: "transparent", border: "none", color: BRAND.magenta, fontSize: 12, fontWeight: 600, cursor: "pointer", padding: "3px 6px" }}>Clear all</button>
+          )}
+        </div>
+      )}
+
+      {/* Result count + sort */}
+      <div style={{ padding: "12px 16px 6px", display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+        <div style={{ fontSize: 13, color: BRAND.grey11 }}>
+          <span style={{ color: BRAND.ink, fontWeight: 600 }}>{filtered.length} result{filtered.length === 1 ? "" : "s"}</span>
+          {(activeFilterCount > 0 || phase !== "all") && <span> · filtered</span>}
+        </div>
+        <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}
+          style={{ fontSize: 12, padding: "4px 8px", border: "1px solid " + BRAND.grey2, borderRadius: 7, background: "#fff", color: BRAND.ink2, fontFamily: sans, appearance: "none", paddingRight: 24, backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2358595B' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\")", backgroundRepeat: "no-repeat", backgroundPosition: "right 7px center" }}>
+          <option value="relevance">Sort: catalog</option>
+          <option value="title">Sort: title A–Z</option>
+          <option value="code">Sort: code</option>
+          <option value="specialty">Sort: specialty</option>
+        </select>
+      </div>
+
+      {/* Results */}
+      <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "4px 14px 14px", WebkitOverflowScrolling: "touch" }}>
+        {filtered.length === 0 ? (
+          <div style={{ background: "#fff", borderRadius: 12, padding: "44px 20px", textAlign: "center", color: BRAND.grey11, fontSize: 14, marginTop: 8 }}>
+            <div style={{ marginBottom: 6, fontWeight: 600, color: BRAND.ink }}>No electives match.</div>
+            Try removing filters, or{" "}
+            <button onClick={clearAll} style={{ background: "transparent", border: "none", color: BRAND.cyan, fontWeight: 600, cursor: "pointer", padding: 0, fontSize: 14 }}>clear all</button>.
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, paddingBottom: 16 }}>
+            {filtered.map((e) => (
+              <ElectiveCard key={e.code} e={e} onOpen={() => onOpen(e.code)} saved={savedSet.has(e.code)} onToggleSave={() => onToggleSave(e.code)} reason={e.why}/>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function FilterChips({ filters, setFilters, onOpenFilters }) {
+  // Quick toggles for the most common filters; tapping opens the full sheet for that facet.
+  const chips = [
+    { key: "specialty", label: filters.specialty === "All" ? "Specialty" : filters.specialty, dropdown: true },
+    { key: "duration",  label: filters.duration  === "All" ? "Duration"  : filters.duration,  dropdown: true },
+    { key: "audition",  label: filters.audition  === "Yes" ? "Audition"  : (filters.audition === "All" ? "Audition" : "Non-audition"), dropdown: true, toggled: filters.audition !== "All" },
+    { key: "site",      label: filters.site      === "All" ? "Site"      : filters.site,      dropdown: true },
+    { key: "setting",   label: filters.setting   === "All" ? "Setting"   : filters.setting,   dropdown: true },
+  ];
+  return (
+    <div style={{ background: "#fff", borderBottom: "1px solid " + BRAND.grey2, padding: "10px 0", display: "flex", gap: 7, overflowX: "auto", overflowY: "hidden", paddingLeft: 14, paddingRight: 14, scrollbarWidth: "none", whiteSpace: "nowrap" }}>
+      {chips.map((c) => {
+        const on = filters[c.key] !== "All";
+        return (
+          <button key={c.key} onClick={onOpenFilters}
+            style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 999, whiteSpace: "nowrap",
+                     background: on ? BRAND.magenta : "#fff",
+                     color: on ? "#fff" : BRAND.ink,
+                     border: on ? "1px solid " + BRAND.magenta : "1px solid " + BRAND.grey3,
+                     fontSize: 13, fontWeight: 500, cursor: "pointer", flexShrink: 0 }}>
+            {c.label}
+            {c.dropdown && <IconChevD size={11} stroke={on ? "#fff" : BRAND.ink} sw={2.6}/>}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function RemovableChip({ label, onRemove }) {
+  return (
+    <button onClick={onRemove}
+      style={{ display: "inline-flex", alignItems: "center", gap: 5, background: BRAND.cyanTint, color: BRAND.cyanDeep, border: "none", padding: "4px 8px 4px 10px", borderRadius: 999, fontSize: 12, fontWeight: 600, cursor: "pointer", flexShrink: 0 }}>
+      {label}<IconClose size={10} stroke={BRAND.cyanDeep} sw={3}/>
+    </button>
+  );
+}
+
+function ElectiveCard({ e, onOpen, saved, onToggleSave, reason }) {
+  const c = specColor(e.specialty);
+  return (
+    <div onClick={onOpen}
+      style={{ background: "#fff", borderRadius: 12, boxShadow: "0 1px 2px rgba(0,0,0,0.05), 0 4px 12px rgba(0,0,0,0.04)", display: "flex", overflow: "hidden", cursor: "pointer", WebkitTapHighlightColor: "rgba(0,0,0,0.06)" }}>
+      <div style={{ width: 5, background: c, flex: "0 0 5px" }}/>
+      <div style={{ flex: 1, padding: "12px 14px", minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+          <div style={{ fontFamily: "'JetBrains Mono', ui-monospace, monospace", fontSize: 11, color: c, fontWeight: 700, letterSpacing: 0.3 }}>{e.code}</div>
+          <button onClick={(ev) => { ev.stopPropagation(); onToggleSave(); }} style={{ background: "transparent", border: "none", padding: 4, margin: -4, cursor: "pointer", color: saved ? BRAND.magenta : BRAND.grey3, display: "grid", placeItems: "center" }}>
+            {saved ? <IconBookmarkF size={18}/> : <IconBookmark size={18} sw={2}/>}
+          </button>
+        </div>
+        <div style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.25, marginBottom: 6, color: BRAND.ink }}>{e.title}</div>
+        <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+          <Tag color={c}>{e.specialty}</Tag>
+          <Tag>{(e.durationOptions || "").replace(/\s/g, "")} wk</Tag>
+          <Tag>{yearToPhasesShort(e.yearEligibility)}</Tag>
+          {e.audition === "Yes" && <Tag color={BRAND.magenta}>Audition</Tag>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Elective detail ──────────────────────────────────────────
+function ElectiveDetail({ code, onBack, saved, onToggleSave }) {
+  const all = window.ELECTIVES || [];
+  const e = all.find((x) => x.code === code);
+  if (!e) {
+    return (
+      <div style={{ padding: 40, textAlign: "center", color: BRAND.grey11, fontFamily: "'Inter Tight', system-ui" }}>
+        <div style={{ marginBottom: 12 }}>Elective not found.</div>
+        <button onClick={onBack} style={{ background: BRAND.cyan, color: "#fff", border: "none", padding: "10px 20px", borderRadius: 8, fontSize: 14, fontWeight: 600 }}>Back</button>
+      </div>
+    );
+  }
+  const c = specColor(e.specialty);
+  const sans = "'Inter Tight', system-ui, sans-serif";
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", background: BRAND.bg, fontFamily: sans, color: BRAND.ink, overflow: "hidden" }}>
+      {/* Banner */}
+      <div style={{ background: c, color: "#fff", paddingTop: "max(env(safe-area-inset-top, 12px), 12px)" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px 18px" }}>
+          <button onClick={onBack} style={{ width: 36, height: 36, borderRadius: 999, background: "rgba(255,255,255,0.18)", border: "none", color: "#fff", display: "grid", placeItems: "center", cursor: "pointer" }}>
+            <IconBack size={20} stroke="#fff" sw={2.2}/>
+          </button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={onToggleSave} style={{ width: 36, height: 36, borderRadius: 999, background: "rgba(255,255,255,0.18)", border: "none", color: "#fff", display: "grid", placeItems: "center", cursor: "pointer" }}>
+              {saved ? <IconBookmarkF size={18}/> : <IconBookmark size={18} sw={2}/>}
+            </button>
+            <button onClick={() => { try { navigator.share && navigator.share({ title: e.title, text: e.code + " — " + e.title }); } catch {} }}
+                    style={{ width: 36, height: 36, borderRadius: 999, background: "rgba(255,255,255,0.18)", border: "none", color: "#fff", display: "grid", placeItems: "center", cursor: "pointer" }}>
+              <IconShare size={18} stroke="#fff" sw={2}/>
+            </button>
+          </div>
+        </div>
+        <div style={{ padding: "0 18px 22px" }}>
+          <div style={{ fontFamily: "'JetBrains Mono', ui-monospace, monospace", fontSize: 13, opacity: 0.9, letterSpacing: 0.4, marginBottom: 6 }}>{e.code}</div>
+          <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: -0.4, lineHeight: 1.15 }}>{e.title}</div>
+          <div style={{ display: "flex", gap: 6, marginTop: 12, flexWrap: "wrap" }}>
+            <Tag dark>{e.specialty}</Tag>
+            <Tag dark>{e.type}</Tag>
+            {e.audition === "Yes" && <Tag dark>Audition eligible</Tag>}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ flex: 1, overflowY: "auto", padding: "16px 14px 18px", marginTop: -14, background: BRAND.bg, borderTopLeftRadius: 18, borderTopRightRadius: 18, WebkitOverflowScrolling: "touch" }}>
+        {/* Quick stats */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 14 }}>
+          <StatTile label="Duration" value={(e.durationOptions || "—") + " wk"}/>
+          <StatTile label="Eligible" value={yearToPhasesShort(e.yearEligibility)}/>
+          <StatTile label="Setting" value={e.clinicalSetting || "—"} small/>
+        </div>
+
+        <InfoBlock label="Eligibility & duration">
+          <Row k="Year eligibility" v={yearToPhases(e.yearEligibility)}/>
+          <Row k="Duration options" v={(e.durationOptions || "—") + " weeks"}/>
+          <Row k="Intensity" v={e.intensity || "—"}/>
+        </InfoBlock>
+
+        <InfoBlock label="Site & setting">
+          <Row k="Site(s)" v={e.sites || "—"}/>
+          <Row k="Clinical setting" v={e.clinicalSetting || "—"}/>
+          <Row k="Audition" v={e.audition === "Yes" ? "Audition-eligible" : "Not audition"} accent={e.audition === "Yes" ? BRAND.magenta : null}/>
+        </InfoBlock>
+
+        {e.residencyTracks && (
+          <InfoBlock label="Residency tracks">
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, padding: "10px 0 0" }}>
+              {e.residencyTracks.split(";").map((t) => t.trim()).filter(Boolean).map((t) => (
+                <div key={t} style={{ fontSize: 12, border: "1px solid " + BRAND.grey2, padding: "5px 10px", borderRadius: 999, color: BRAND.ink2, fontWeight: 500 }}>{t}</div>
+              ))}
+            </div>
+          </InfoBlock>
+        )}
+
+        {e.keywords && (
+          <InfoBlock label="Keywords">
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 5, padding: "10px 0 0" }}>
+              {e.keywords.split(";").map((k) => k.trim()).filter(Boolean).map((k) => (
+                <div key={k} style={{ fontSize: 11.5, padding: "3px 8px", background: BRAND.grey1, color: BRAND.ink2, borderRadius: 6, fontWeight: 500 }}>{k}</div>
+              ))}
+            </div>
+          </InfoBlock>
+        )}
+
+        {e.erasCategory && (
+          <InfoBlock label="ERAS category">
+            <div style={{ fontSize: 14, padding: "10px 0 0", color: BRAND.ink2 }}>{e.erasCategory}</div>
+          </InfoBlock>
+        )}
+
+        <div style={{ marginTop: 6, padding: "12px 0 4px", fontSize: 12, color: BRAND.grey11, textAlign: "center" }}>
+          From the ASCEND Electives Catalog — AY 2026–27
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StatTile({ label, value, small }) {
+  return (
+    <div style={{ background: "#fff", borderRadius: 10, padding: "10px 11px", minHeight: 56 }}>
+      <div style={{ fontSize: 10, color: BRAND.grey11, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600, marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: small ? 12 : 14, fontWeight: 600, color: BRAND.ink, lineHeight: 1.2 }}>{value}</div>
+    </div>
+  );
+}
+function InfoBlock({ label, children }) {
+  return (
+    <div style={{ background: "#fff", borderRadius: 12, padding: "14px 16px 16px", marginBottom: 10 }}>
+      <div style={{ fontSize: 11, color: BRAND.grey11, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600, marginBottom: 6 }}>{label}</div>
+      {children}
+    </div>
+  );
+}
+// Same visual as InfoBlock but the header is a button; tapping toggles the body.
+// Default state controlled by `defaultOpen` (defaults to true).
+function CollapsibleInfoBlock({ label, count, children, defaultOpen = true }) {
+  const [open, setOpen] = useStateMA(defaultOpen);
+  return (
+    <div style={{ background: "#fff", borderRadius: 12, padding: 0, marginBottom: 10, overflow: "hidden" }}>
+      <button onClick={() => setOpen(o => !o)}
+        style={{ width: "100%", padding: "14px 16px", background: "transparent", border: "none", cursor: "pointer",
+                 display: "flex", alignItems: "center", justifyContent: "space-between", textAlign: "left", fontFamily: "inherit" }}>
+        <span style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+          <span style={{ fontSize: 11, color: BRAND.grey11, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600 }}>{label}</span>
+          {typeof count === "number" && (
+            <span style={{ fontSize: 10.5, color: BRAND.grey11, fontWeight: 600,
+                           background: BRAND.grey1, padding: "1px 6px", borderRadius: 999, border: "1px solid " + BRAND.grey2 }}>{count}</span>
+          )}
+        </span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={BRAND.grey8}
+             strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"
+             style={{ transition: "transform 160ms ease", transform: open ? "rotate(180deg)" : "rotate(0deg)" }}>
+          <polyline points="6 9 12 15 18 9"/>
+        </svg>
+      </button>
+      {open && <div style={{ padding: "0 16px 16px" }}>{children}</div>}
+    </div>
+  );
+}
+function Row({ k, v, accent }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid " + BRAND.grey2, fontSize: 13.5, alignItems: "baseline" }}>
+      <div style={{ color: BRAND.grey11 }}>{k}</div>
+      <div style={{ color: accent || BRAND.ink, fontWeight: accent ? 700 : 500, textAlign: "right", maxWidth: "62%" }}>{v}</div>
+    </div>
+  );
+}
+
+// ─── Filter sheet ─────────────────────────────────────────────
+function FilterSheet({ open, onClose }) {
+  const all = window.ELECTIVES || [];
+  const { filters, setFilters } = window.__mobileFilters || { filters: {}, setFilters: () => {} };
+  const [local, setLocal] = useStateMA(filters);
+  useEffectMA(() => { if (open) setLocal(filters); }, [open, filters]);
+
+  const facets = useMemoMA(() => {
+    const f = (key, split = null) => {
+      const set = new Set();
+      for (const e of all) {
+        const v = e[key]; if (!v) continue;
+        if (split) v.split(split).forEach((p) => { const t = p.trim(); if (t) set.add(t); });
+        else set.add(v);
+      }
+      return [...set].sort();
+    };
+    return {
+      specialties: f("specialty"),
+      types:       f("type"),
+      settings:    f("clinicalSetting"),
+      intensities: f("intensity"),
+      auditions:   f("audition"),
+      sites:       f("sites", ";"),
+      durations:   (() => {
+        const set = new Set();
+        for (const e of all) (e.durationOptions || "").split(",").forEach((p) => { const t = p.trim(); if (t) set.add(t); });
+        return [...set].sort((a, b) => parseInt(a) - parseInt(b)).map((d) => `${d} weeks`);
+      })(),
+    };
+  }, [all]);
+
+  if (!open) return null;
+  const sans = "'Inter Tight', system-ui, sans-serif";
+
+  function apply() { setFilters(local); onClose(); }
+  function reset() { const r = { specialty: "All", type: "All", duration: "All", setting: "All", intensity: "All", audition: "All", site: "All" }; setLocal(r); }
+
+  const sections = [
+    { key: "specialty", label: "Specialty",        opts: ["All", ...facets.specialties] },
+    { key: "duration",  label: "Duration",         opts: ["All", ...facets.durations] },
+    { key: "site",      label: "Site",             opts: ["All", ...facets.sites] },
+    { key: "setting",   label: "Clinical setting", opts: ["All", ...facets.settings] },
+    { key: "intensity", label: "Intensity",        opts: ["All", ...facets.intensities] },
+    { key: "audition",  label: "Audition",         opts: ["All", ...facets.auditions] },
+    { key: "type",      label: "Type",             opts: ["All", ...facets.types] },
+  ];
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(14,26,42,0.55)", zIndex: 100, display: "flex", flexDirection: "column", justifyContent: "flex-end", fontFamily: sans }} onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()}
+        style={{ background: "#fff", borderTopLeftRadius: 18, borderTopRightRadius: 18, height: "92%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        {/* Drag handle */}
+        <div style={{ display: "grid", placeItems: "center", padding: "8px 0 4px" }}>
+          <div style={{ width: 36, height: 4, background: BRAND.grey3, borderRadius: 999 }}/>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 18px 14px", borderBottom: "1px solid " + BRAND.grey2 }}>
+          <button onClick={reset} style={{ background: "transparent", border: "none", color: BRAND.grey11, fontSize: 14, fontWeight: 500, cursor: "pointer" }}>Reset</button>
+          <div style={{ fontSize: 17, fontWeight: 600 }}>Filters</div>
+          <button onClick={onClose} style={{ background: "transparent", border: "none", color: BRAND.cyan, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Cancel</button>
+        </div>
+        <div style={{ flex: 1, overflowY: "auto", padding: "10px 14px 14px", WebkitOverflowScrolling: "touch" }}>
+          {sections.map((s) => (
+            <FilterGroup key={s.key} label={s.label} value={local[s.key] || "All"} options={s.opts} onChange={(v) => setLocal({ ...local, [s.key]: v })}/>
+          ))}
+        </div>
+        <div style={{ padding: "12px 14px", borderTop: "1px solid " + BRAND.grey2, paddingBottom: "max(env(safe-area-inset-bottom, 16px), 16px)" }}>
+          <button onClick={apply} style={{ width: "100%", background: BRAND.magenta, color: "#fff", border: "none", padding: "14px 20px", borderRadius: 12, fontSize: 16, fontWeight: 600, cursor: "pointer", boxShadow: "0 4px 14px rgba(216,11,140,0.30)" }}>Apply filters</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FilterGroup({ label, value, options, onChange }) {
+  const [open, setOpen] = useStateMA(value !== "All");
+  return (
+    <div style={{ marginBottom: 10, background: BRAND.grey1, borderRadius: 12, overflow: "hidden" }}>
+      <button onClick={() => setOpen((o) => !o)}
+        style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", background: "transparent", border: "none", width: "100%", textAlign: "left", cursor: "pointer", fontFamily: "inherit" }}>
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: BRAND.ink }}>{label}</div>
+          <div style={{ fontSize: 12, color: value === "All" ? BRAND.grey11 : BRAND.magenta, marginTop: 2, fontWeight: value === "All" ? 500 : 600 }}>{value === "All" ? "Any" : value}</div>
+        </div>
+        <IconChevD size={16} stroke={BRAND.grey11} sw={2} style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform .2s" }}/>
+      </button>
+      {open && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, padding: "0 12px 12px" }}>
+          {options.map((o) => {
+            const on = o === value;
+            return (
+              <button key={o} onClick={() => onChange(o)}
+                style={{ background: on ? BRAND.magenta : "#fff", color: on ? "#fff" : BRAND.ink, border: on ? "1px solid " + BRAND.magenta : "1px solid " + BRAND.grey2, padding: "6px 12px", borderRadius: 999, fontSize: 12.5, fontWeight: 500, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5 }}>
+                {on && <IconCheck size={11} stroke="#fff" sw={3}/>}
+                {o}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Saved tab ────────────────────────────────────────────────
+function SavedList({ savedSet, onOpen, onToggleSave, onGoBrowse }) {
+  const all = window.ELECTIVES || [];
+  const saved = all.filter((e) => savedSet.has(e.code));
+  const sans = "'Inter Tight', system-ui, sans-serif";
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", background: BRAND.bg, fontFamily: sans, color: BRAND.ink, overflow: "hidden" }}>
+      <div style={{ background: IS_DIRECTORS ? "#C026D3" : BRAND.cyan, color: "#fff", paddingTop: "max(env(safe-area-inset-top, 12px), 12px)", paddingBottom: 18 }}>
+        <div style={{ padding: "10px 16px 4px", display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ width: 10, height: 10, borderRadius: 2, background: "#fff" }}/>
+          <div style={{ fontSize: 19, fontWeight: 600, letterSpacing: -0.2 }}>Saved</div>
+        </div>
+        <div style={{ padding: "0 16px", fontSize: 13, opacity: 0.9, marginTop: 4 }}>{saved.length} elective{saved.length === 1 ? "" : "s"} bookmarked</div>
+      </div>
+      <div style={{ flex: 1, overflowY: "auto", padding: "12px 14px 14px" }}>
+        {saved.length === 0 ? (
+          <div style={{ background: "#fff", borderRadius: 12, padding: "44px 24px", textAlign: "center", color: BRAND.grey11, marginTop: 12 }}>
+            <div style={{ display: "grid", placeItems: "center", marginBottom: 10, color: BRAND.grey3 }}>
+              <IconBookmark size={36} stroke={BRAND.grey3} sw={1.5}/>
+            </div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: BRAND.ink, marginBottom: 4 }}>No saved electives yet</div>
+            <div style={{ fontSize: 13, marginBottom: 14 }}>Tap the bookmark on any elective to add it here.</div>
+            <button onClick={onGoBrowse} style={{ background: BRAND.cyan, color: "#fff", border: "none", padding: "10px 18px", borderRadius: 10, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Browse catalog</button>
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, paddingBottom: 16 }}>
+            {saved.map((e) => (
+              <ElectiveCard key={e.code} e={e} onOpen={() => onOpen(e.code)} saved={true} onToggleSave={() => onToggleSave(e.code)}/>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Curriculum search (sessions / modules / MEPOs / MLOs) ────
+// Mobile port of the desktop global search. Reads from window.CURRICULUM and
+// window.SESSIONS; both are populated by data.js + sessions-data.js.
+function buildCurriculumIndex() {
+  const idx = [];
+  const C = window.CURRICULUM;
+  const S = window.SESSIONS || {};
+  if (!C) return idx;
+  for (const m of (C.MODULES || [])) {
+    idx.push({
+      kind: "Module", id: m.id,
+      title: m.short || m.id, sub: m.name || "",
+      meta: [m.year, m.phase, m.weeks ? m.weeks + "w" : null].filter(Boolean).join(" · "),
+      haystack: [m.id, m.short, m.name, m.phase, m.year].filter(Boolean).join(" ").toLowerCase(),
+      payload: { module: m },
+    });
+  }
+  for (const me of (C.MEPOS || [])) {
+    idx.push({
+      kind: "MEPO", id: me.code,
+      title: me.code, sub: me.title || "",
+      meta: [me.domainCode, me.domain].filter(Boolean).join(" · "),
+      haystack: [me.code, me.title, me.domain, me.domainCode].filter(Boolean).join(" ").toLowerCase(),
+      payload: { mepo: me },
+    });
+  }
+  for (const [modId, pack] of Object.entries(S)) {
+    if (!pack) continue;
+    const m = (C.MODULES || []).find((x) => x.id === modId);
+    const modShort = (m && m.short) || modId;
+    for (const mlo of (pack.mlos || [])) {
+      idx.push({
+        kind: "MLO", id: modId + ":" + mlo.code,
+        title: modShort + " · " + mlo.code, sub: mlo.text || "",
+        meta: (mlo.mepo || []).join(", "),
+        haystack: [modShort, modId, mlo.code, mlo.text, ...(mlo.mepo || [])].filter(Boolean).join(" ").toLowerCase(),
+        payload: { mlo, moduleId: modId, moduleShort: modShort },
+      });
+    }
+    for (const s of (pack.sessions || [])) {
+      const slos = (s.objectives && s.objectives.length)
+        ? s.objectives.map((o) => o.text).filter(Boolean)
+        : (s.slos || []).filter(Boolean);
+      idx.push({
+        kind: "Session", id: s.id,
+        title: s.title, sub: modShort + (s.week ? " · Week " + s.week : "") + (s.type ? " · " + s.type : ""),
+        meta: [s.duration ? s.duration + " min" : null, s.faculty].filter(Boolean).join(" · "),
+        haystack: [s.title, modShort, modId, s.type, s.faculty, s.methods, ...slos, s.keywords, s.clinical, s.societal].filter(Boolean).join(" ").toLowerCase(),
+        payload: { session: s, moduleId: modId, moduleShort: modShort, slos },
+      });
+    }
+  }
+  return idx;
+}
+
+function scoreCurriculum(item, tokens) {
+  let score = 0;
+  for (const t of tokens) {
+    const i = item.haystack.indexOf(t);
+    if (i < 0) return -1;
+    score += 1;
+    if (item.title && item.title.toLowerCase().includes(t)) score += 3;
+    if (item.sub && item.sub.toLowerCase().includes(t)) score += 1;
+    if (i < 60) score += 0.5;
+  }
+  if (item.kind === "Session") score += 1.5;
+  return score;
+}
+
+const KIND_PALETTE = {
+  Session: { color: BRAND.cyanDeep, tint: BRAND.cyanTint, label: "Session" },
+  Module:  { color: BRAND.cyan,     tint: BRAND.cyanTint, label: "Module" },
+  MEPO:    { color: BRAND.violet,   tint: BRAND.violetTint, label: "MEPO" },
+  MLO:     { color: BRAND.magenta,  tint: BRAND.magentaTint, label: "MLO" },
+};
+
+// ─── Browse hub ────────────────────────────────────────────────
+// Top-level entry points the user sees when opening Search with an empty
+// query. Tapping a tile drills into a list of modules / placeholder items.
+// Items with `placeholder: true` open a "coming soon" detail view. Items
+// with `children` open another drilldown level (Acting Internships and
+// AI-Subspecialty have two levels of expansion).
+const BROWSE_HUB = [
+  { id: "legacy", label: "Legacy Curriculum", sub: "Pre-triphasic clerkships & AIs",
+    color: BRAND.grey11, tint: BRAND.grey1, glyph: "LC",
+    items: [
+      { id: "lc-amb", label: "Ambulatory Care-Geriatrics Clerkship",   placeholder: true },
+      { id: "lc-em",  label: "Emergency Medicine Clerkship", placeholder: true },
+      { id: "lc-ttr", label: "Transition to Residency",     placeholder: true },
+      { id: "lc-ai",  label: "Acting Internships",          sub: "4 specialties · tap to expand",
+        children: [
+          { id: "lc-ai-med",   label: "AI — Medicine",            placeholder: true },
+          { id: "lc-ai-peds",  label: "AI — Pediatrics",          placeholder: true },
+          { id: "lc-ai-surg",  label: "AI — General Surgery",     placeholder: true },
+          { id: "lc-ai-sub",   label: "AI — Subspecialty",        sub: "6 subspecialties",
+            children: [
+              { id: "lc-ai-uro",     label: "AI — Urology",          placeholder: true },
+              { id: "lc-ai-plastic", label: "AI — Plastic Surgery",  placeholder: true },
+              { id: "lc-ai-ent",     label: "AI — ENT",              placeholder: true },
+              { id: "lc-ai-vasc",    label: "AI — Vascular Surgery", placeholder: true },
+              { id: "lc-ai-ortho",   label: "AI — Orthopedics",      placeholder: true },
+              { id: "lc-ai-nsx",     label: "AI — Neurosurgery",     placeholder: true },
+            ] },
+        ] },
+    ] },
+  { id: "p1", label: "Phase 1", sub: "Foundations & Organ Systems",
+    color: BRAND.cyan, tint: BRAND.cyanTint, glyph: "P1",
+    modulesFilter: (m) => m.phase === "Foundations" || m.phase === "Systems" },
+  { id: "p2", label: "Phase 2", sub: "Core clerkships",
+    color: BRAND.magenta, tint: BRAND.magentaTint, glyph: "P2",
+    items: [
+      { id: "p2-em",    label: "Emergency Medicine Clerkship",  placeholder: true },
+      { id: "p2-im",    label: "Inpatient Medicine Clerkship",  placeholder: true },
+      { id: "p2-neuro", label: "Neurology Clerkship",           placeholder: true },
+      { id: "p2-obgyn", label: "OB/GYN Clerkship",              placeholder: true },
+      { id: "p2-pal",   label: "Palliative Care Clerkship",     placeholder: true },
+      { id: "p2-peds",  label: "Pediatrics Clerkship",          placeholder: true },
+      { id: "p2-psych", label: "Psychiatry Clerkship",          placeholder: true },
+      { id: "p2-surg",  label: "Surgery Clerkship",             placeholder: true },
+    ] },
+  { id: "p3", label: "Phase 3", sub: "TTR · CCC · Acting Internships",
+    color: BRAND.violet, tint: BRAND.violetTint, glyph: "P3",
+    items: [
+      { id: "p3-ai",  label: "Acting Internships",      sub: "5 specialties · tap to expand",
+        children: [
+          { id: "ai-em",    label: "AI — Emergency Medicine",  placeholder: true },
+          { id: "ai-surg",  label: "AI — General Surgery",     placeholder: true },
+          { id: "ai-med",   label: "AI — Medicine",            placeholder: true },
+          { id: "ai-peds",  label: "AI — Pediatrics",          placeholder: true },
+          { id: "ai-sub",   label: "AI — Subspecialty",        sub: "6 subspecialties",
+            children: [
+              { id: "ai-ent",     label: "AI — ENT",              placeholder: true },
+              { id: "ai-nsx",     label: "AI — Neurosurgery",     placeholder: true },
+              { id: "ai-ortho",   label: "AI — Orthopedics",      placeholder: true },
+              { id: "ai-plastic", label: "AI — Plastic Surgery",  placeholder: true },
+              { id: "ai-uro",     label: "AI — Urology",          placeholder: true },
+              { id: "ai-vasc",    label: "AI — Vascular Surgery", placeholder: true },
+            ] },
+        ] },
+      { id: "p3-ccc", label: "Chronic Care Clerkship",  placeholder: true },
+      { id: "p3-ttr", label: "Transition to Residency", placeholder: true },
+    ] },
+  { id: "long", label: "Longitudinal", sub: "POM 1–3 · THINQ",
+    color: BRAND.cyanDeep, tint: BRAND.cyanTint, glyph: "L",
+    modulesFilter: (m) => m.phase === "Longitudinal" },
+  { id: "caps", label: "Capstones", sub: "PEAKS & year-end assessments",
+    color: BRAND.magentaDeep, tint: BRAND.magentaTint, glyph: "C",
+    modulesFilter: (m) => m.phase === "Capstone" },
+  { id: "trans", label: "Transitions", sub: "BaseCamp · TP2 · TP3",
+    color: BRAND.ink2, tint: BRAND.grey1, glyph: "T",
+    items: [
+      { id: "tr-bc",  label: "BaseCamp",                    placeholder: true },
+      { id: "tr-tp2", label: "Transition to Phase 2 (TP2)", placeholder: true },
+      { id: "tr-tp3", label: "Transition to Phase 3 (TP3)", placeholder: true },
+    ] },
+
+  // Cross-cutting tiles — appear at the end of the hub. Each child has a
+  // sessionsFilter that nodeChildren / tapNode resolves into a session list.
+  { id: "aocs", label: "Areas of Concentration", sub: "SSD · PCA · HDS · LPI",
+    color: BRAND.violet, tint: BRAND.violetTint, glyph: "AOC",
+    items: [
+      { id: "aoc-ssd", label: "Scientific & Scholarly Discovery (SSD)", sub: "Inquiry, research, scholarly product",        sessionsFilter: { aoc: "SSD" } },
+      { id: "aoc-pca", label: "Patient-Centered Advocacy (PCA)",        sub: "Advocacy for patients & populations",         sessionsFilter: { aoc: "PCA" } },
+      { id: "aoc-hds", label: "Healthcare Delivery Science (HDS)",      sub: "Quality, safety, systems-based practice",     sessionsFilter: { aoc: "HDS" } },
+      { id: "aoc-lpi", label: "Leadership & Professional Identity Formation (LPI)", sub: "Leadership, teaching, ethics, communication", sessionsFilter: { aoc: "LPI" } },
+    ] },
+  { id: "threads", label: "Curricular Threads", sub: "Longitudinal cross-curriculum threads",
+    color: BRAND.cyanDeep, tint: BRAND.cyanTint, glyph: "CT",
+    items: [
+      { id: "th-ai",     label: "Artificial Intelligence",   sessionsFilter: { threadId: "ai" } },
+      { id: "th-dp",     label: "Disease Prevention",         sessionsFilter: { threadId: "dp" } },
+      { id: "th-embr",   label: "Embryology",                 sessionsFilter: { threadId: "embr" } },
+      { id: "th-hm",     label: "Health Maintenance",         sessionsFilter: { threadId: "hm" } },
+      { id: "th-micro",  label: "Microbiology",               sessionsFilter: { threadId: "micro" } },
+      { id: "th-nutr",   label: "Nutrition",                  sessionsFilter: { threadId: "nutr" } },
+      { id: "th-pharm",  label: "Pharmacology",               sessionsFilter: { threadId: "pharm" } },
+      { id: "th-phys",   label: "Physiology",                 sessionsFilter: { threadId: "phys" } },
+    ] },
+];
+
+function CurriculumSearch({ onOpenResult, onOpenPlaceholder, q, setQ, navPath, setNavPath, filter, setFilter, askMode, setAskMode, askLoading, askResult, askError, onAsk }) {
+  // q / navPath / filter / askMode controlled by MobileApp so the user's
+  // browse position + Ask-ASCEND answer survives detail-open/close.
+  const [qLocal, setQLocal] = useStateMA("");
+  const [filterLocal, setFilterLocal] = useStateMA("All");
+  const [navPathLocal, setNavPathLocal] = useStateMA([]);
+  const [askModeLocal, setAskModeLocal] = useStateMA(false);
+  if (q === undefined)        { q = qLocal;        setQ = setQLocal; }
+  if (filter === undefined)   { filter = filterLocal;   setFilter = setFilterLocal; }
+  if (navPath === undefined)  { navPath = navPathLocal; setNavPath = setNavPathLocal; }
+  if (askMode === undefined)  { askMode = askModeLocal; setAskMode = setAskModeLocal; }
+  const index = useMemoMA(() => buildCurriculumIndex(), []);
+
+  const C = window.CURRICULUM;
+  const hasData = !!(C && (C.MODULES || []).length > 0);
+
+  const trimQ = q.trim();
+  const tokens = useMemoMA(() => trimQ.toLowerCase().split(/\s+/).filter(Boolean), [trimQ]);
+  const inSearch = trimQ.length > 0;
+
+  const results = useMemoMA(() => {
+    if (!tokens.length) return [];
+    const scored = index.map((it) => ({ it, s: scoreCurriculum(it, tokens) })).filter((x) => x.s >= 0);
+    scored.sort((a, b) => b.s - a.s);
+    return scored.map((x) => x.it);
+  }, [index, tokens]);
+
+  const filtered = filter === "All" ? results : results.filter((r) => r.kind === filter);
+  const groups = ["Session", "Module", "MEPO", "MLO"];
+  const counts = {};
+  for (const r of results) counts[r.kind] = (counts[r.kind] || 0) + 1;
+
+  const currentNode = navPath.length ? navPath[navPath.length - 1] : null;
+
+  function openHubTile(tile) { setNavPath([tile]); }
+  function pushNode(node)   { setNavPath((p) => [...p, node]); }
+  function popNode()        { setNavPath((p) => p.slice(0, -1)); }
+  function resetNav()       { setNavPath([]); }
+
+  // Build the list of child rows for a node:
+  //  - sessionsFilter → resolves to a list of matching sessions across all modules
+  //  - explicit children → drilldown nodes
+  //  - explicit items    → leaf list (placeholders / modules)
+  //  - modulesFilter     → derived from CURRICULUM.MODULES
+  function nodeChildren(node) {
+    if (!node) return [];
+    if (node.sessionsFilter) {
+      const S = window.SESSIONS || {};
+      const filter = node.sessionsFilter;
+      const out = [];
+      for (const m of (C && C.MODULES) || []) {
+        const pack = S[m.id]; if (!pack) continue;
+        for (const s of (pack.sessions || [])) {
+          let match = false;
+          if (filter.aoc) {
+            match = (s.aoc || "").trim().toUpperCase() === filter.aoc;
+          } else if (filter.threadId) {
+            // Match against the canonical thread tag injected by
+            // injectCanonicalIntoSessions (s.threads is an array of thread
+            // ids the session belongs to per the master curriculum map).
+            match = Array.isArray(s.threads) && s.threads.includes(filter.threadId);
+          } else if (filter.keywords) {
+            const hay = [s.title, s.methods, s.keywords, s.clinical, s.societal,
+                         ...(s.objectives || []).map((o) => o.text)].filter(Boolean).join(" ");
+            match = filter.keywords.some((k) => new RegExp(k, "i").test(hay));
+          }
+          if (match) {
+            out.push({
+              id: "sess:" + s.id,
+              label: s.title,
+              sub: (m.short || m.id) + (s.week ? " · Week " + s.week : "") + (s.type ? " · " + s.type : ""),
+              meta: [s.duration ? s.duration + " min" : null, s.aoc && filter.aoc ? "AOC: " + s.aoc + (s.aocSubdomain ? " · " + s.aocSubdomain : "") : null].filter(Boolean).join(" · "),
+              sessionPayload: { session: s, module: m },
+            });
+          }
+        }
+      }
+      return out;
+    }
+    if (node.children) return node.children;
+    if (node.items)    return node.items;
+    if (node.modulesFilter && C && C.MODULES) {
+      return C.MODULES.filter(node.modulesFilter).map((m) => ({
+        id: "mod:" + m.id,
+        label: m.short || m.id,
+        sub: m.name || "",
+        meta: [m.year, m.phase === "Systems" ? "Organ Systems" : m.phase, m.weeks ? m.weeks + " wk" : null].filter(Boolean).join(" · "),
+        moduleId: m.id,
+      }));
+    }
+    return [];
+  }
+
+  function tapNode(node) {
+    if (node.sessionsFilter || node.children) { pushNode(node); return; }
+    if (node.sessionPayload) {
+      // Leaf session row inside an AOC / thread list — open in shared detail
+      const sp = node.sessionPayload;
+      const moduleShort = sp.module.short || sp.module.id;
+      const slos = (sp.session.objectives && sp.session.objectives.length)
+        ? sp.session.objectives.map((o) => o.text).filter(Boolean)
+        : (sp.session.slos || []).filter(Boolean);
+      onOpenResult({
+        kind: "Session", id: sp.session.id,
+        title: sp.session.title,
+        sub: moduleShort + (sp.session.week ? " · Week " + sp.session.week : "") + (sp.session.type ? " · " + sp.session.type : ""),
+        meta: [sp.session.duration ? sp.session.duration + " min" : null, sp.session.faculty].filter(Boolean).join(" · "),
+        payload: { session: sp.session, moduleId: sp.module.id, moduleShort, slos },
+      });
+      return;
+    }
+    if (node.moduleId) {
+      const it = index.find((x) => x.kind === "Module" && x.id === node.moduleId);
+      if (it) onOpenResult(it);
+      return;
+    }
+    if (node.placeholder) {
+      onOpenPlaceholder({
+        label: node.label,
+        breadcrumb: [...navPath.map((n) => n.label), node.label],
+        color: navPath[0] && navPath[0].color,
+        item: node,
+      });
+    }
+  }
+
+  const sans = "'Inter Tight', system-ui, sans-serif";
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", background: BRAND.bg, fontFamily: sans, color: BRAND.ink, overflow: "hidden" }}>
+      {/* Cyan app bar */}
+      <div style={{ background: IS_DIRECTORS ? "#C026D3" : BRAND.cyan, color: "#fff", paddingTop: "max(env(safe-area-inset-top, 12px), 12px)", paddingBottom: 14 }}>
+        <div style={{ padding: "10px 16px 12px", display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ width: 10, height: 10, borderRadius: 2, background: "#fff" }}/>
+          <div style={{ fontSize: 19, fontWeight: 600, letterSpacing: -0.2 }}>{(typeof window !== "undefined" && window.DASHBOARD_LABEL) || "ASCEND Curriculum"}</div>
+        </div>
+        <div style={{ padding: "0 14px" }}>
+          <div style={{ background: "rgba(255,255,255,0.97)", borderRadius: 12, padding: "11px 14px", display: "flex", alignItems: "center", gap: 10, boxShadow: "0 1px 6px rgba(0,0,0,0.05)" }}>
+            <IconSearch size={18} stroke={BRAND.grey11} sw={2}/>
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search sessions, modules, MEPOs, MLOs…" autoCorrect="off" autoCapitalize="off"
+              style={{ flex: 1, border: "none", outline: "none", background: "transparent", fontSize: 15, fontFamily: sans, color: BRAND.ink, minWidth: 0 }}/>
+            {q ? (
+              <button onClick={() => setQ("")} style={{ background: "transparent", border: "none", padding: 0, color: BRAND.grey11, cursor: "pointer", display: "grid", placeItems: "center" }}>
+                <IconClose size={16} stroke={BRAND.grey11} sw={2}/>
+              </button>
+            ) : null}
+          </div>
+        </div>
+      </div>
+
+      {/* Body */}
+      {!hasData ? (
+        <div style={{ flex: 1, overflowY: "auto", padding: "10px 14px 16px" }}>
+          <div style={{ background: "#fff", borderRadius: 12, padding: "32px 22px", textAlign: "center", color: BRAND.grey11, marginTop: 14 }}>
+            <div style={{ display: "grid", placeItems: "center", marginBottom: 10, color: BRAND.grey3 }}><IconBook size={36} stroke={BRAND.grey3} sw={1.5}/></div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: BRAND.ink, marginBottom: 4 }}>ASCEND Curriculum not loaded</div>
+            <div style={{ fontSize: 13 }}>The session map data isn't available in this build.</div>
+          </div>
+        </div>
+      ) : inSearch ? (
+        <SearchResultsView results={results} filter={filter} setFilter={setFilter} counts={counts} groups={groups} filtered={filtered} onOpen={onOpenResult}/>
+      ) : navPath.length === 0 ? (
+        <BrowseHub onOpenTile={openHubTile}/>
+      ) : (
+        <BrowseLevel node={currentNode} navPath={navPath} onTap={tapNode} onBack={popNode} onHome={resetNav} onJumpTo={(i) => setNavPath((p) => p.slice(0, i + 1))} nodeChildren={nodeChildren}/>
+      )}
+    </div>
+  );
+}
+
+// ─── Ask-ASCEND mobile body ───────────────────────────────────────
+// Mirrors the desktop AskAscendView but in the mobile visual idiom: white
+// cards on the grey app background, picks render as tap-rows that open the
+// shared SearchResultDetail via onOpenSession (the parent maps to onOpenResult).
+function AskAscendMobileView({ q, loading, error, result, onAsk, onOpenSession }) {
+  const sans = "'Inter Tight', system-ui, sans-serif";
+  // Resolve a pick → existing search-index entry so onOpenSession gets the
+  // exact shape SearchResultDetail expects.
+  function openPick(p) {
+    if (!onOpenSession) return;
+    const idx = buildCurriculumIndex();
+    const match = idx.find((it) => it.kind === p.kind && it.id === p.id);
+    if (match) onOpenSession(match);
+  }
+  if (loading) {
+    return (
+      <div style={{ flex: 1, overflowY: "auto", padding: "30px 16px", textAlign: "center", color: BRAND.grey11, fontFamily: sans }}>
+        <div style={{ display: "inline-block", width: 28, height: 28, border: "3px solid " + BRAND.grey2, borderTopColor: BRAND.cyanDeep, borderRadius: "50%", animation: "ask-spin 800ms linear infinite" }}></div>
+        <style>{`@keyframes ask-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+        <div style={{ marginTop: 14, fontSize: 13.5 }}>Asking ASCEND…</div>
+        <div style={{ marginTop: 4, fontSize: 11.5, color: BRAND.grey8, fontStyle: "italic" }}>“{q}”</div>
+      </div>
+    );
+  }
+  if (error) {
+    return (
+      <div style={{ flex: 1, overflowY: "auto", padding: "20px 16px", fontFamily: sans }}>
+        <div style={{ background: "#fff", borderRadius: 12, padding: "18px 16px", color: BRAND.bad, fontWeight: 600 }}>Couldn’t answer that.</div>
+        <div style={{ fontSize: 13, color: BRAND.grey11, marginTop: 8, padding: "0 4px" }}>{error}</div>
+      </div>
+    );
+  }
+  if (!result) {
+    return (
+      <div style={{ flex: 1, overflowY: "auto", padding: "30px 16px", fontFamily: sans, textAlign: "center" }}>
+        <div style={{ color: BRAND.cyanDeep, fontSize: 28, marginBottom: 12 }}>
+          <svg width="38" height="38" viewBox="0 0 24 24" fill="currentColor" style={{ display: "inline-block" }}>
+            <path d="M12 2.5l1.9 5.3L19 9.7l-5.1 1.9L12 17l-1.9-5.4L5 9.7l5.1-1.9L12 2.5z"/>
+            <path d="M19.5 14.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7.7-1.8z"/>
+          </svg>
+        </div>
+        <div style={{ fontSize: 16, fontWeight: 600, color: BRAND.ink, marginBottom: 8 }}>Ask ASCEND</div>
+        <div style={{ fontSize: 13, color: BRAND.grey11, lineHeight: 1.55, maxWidth: 320, margin: "0 auto" }}>
+          Type a question and tap Enter / Send. Examples:
+        </div>
+        <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 6, maxWidth: 320, margin: "14px auto 0", textAlign: "left" }}>
+          {[
+            "Where do students learn about nutrition counseling?",
+            "Which sessions teach disease prevention strategies?",
+            "Where is health maintenance covered in Phase 1?",
+          ].map((ex) => (
+            <button key={ex} onClick={() => onAsk && onAsk(ex)}
+              style={{ background: "#fff", border: "1px solid " + BRAND.grey2, borderRadius: 10, padding: "10px 12px", fontSize: 12.5, color: BRAND.ink2, fontStyle: "italic", textAlign: "left", cursor: "pointer", fontFamily: sans }}>
+              {ex}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div style={{ flex: 1, overflowY: "auto", padding: "16px 14px 18px", fontFamily: sans }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 6, fontSize: 10.5, letterSpacing: "0.08em", textTransform: "uppercase", color: BRAND.cyanDeep, fontWeight: 700, marginBottom: 6, padding: "0 4px" }}>
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5l1.9 5.3L19 9.7l-5.1 1.9L12 17l-1.9-5.4L5 9.7l5.1-1.9L12 2.5z"/></svg>
+        Ask ASCEND
+      </div>
+      <div style={{ fontSize: 12.5, color: BRAND.grey11, marginBottom: 4, padding: "0 4px" }}>“{q}”</div>
+      {result.summary && (
+        <div style={{ background: "#fff", borderRadius: 12, padding: "14px 14px", fontSize: 14, color: BRAND.ink, lineHeight: 1.5, marginBottom: 12 }}>
+          {result.summary}
+        </div>
+      )}
+      {result.picks && result.picks.length > 0 ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {result.picks.map((p, i) => (
+            <button key={p.kind + ":" + p.id + ":" + i} onClick={() => openPick(p)}
+              style={{ background: "#fff", border: "1px solid " + BRAND.grey2, borderRadius: 12, padding: "12px 14px", textAlign: "left", cursor: "pointer", fontFamily: sans, display: "flex", flexDirection: "column", gap: 4, WebkitTapHighlightColor: "rgba(0,0,0,0.06)" }}>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 9.5, letterSpacing: "0.08em", textTransform: "uppercase", color: BRAND.grey11, fontWeight: 700 }}>{p.kind}</span>
+                <span style={{ fontSize: 14, fontWeight: 600, color: p.kind === "Session" ? (BRAND.sessionTitle || "#0B3B7A") : BRAND.ink, lineHeight: 1.3 }}>{p.label}</span>
+              </div>
+              {p.sub && <div style={{ fontSize: 11.5, color: BRAND.grey11 }}>{p.sub}</div>}
+              {p.jamas && p.jamas.length > 0 && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4 }}>
+                  {p.jamas.map((c) => (
+                    <span key={c.n} title={c.text}
+                      style={{ fontSize: 9.5, padding: "1px 6px", borderRadius: 3,
+                        background: BRAND.cyanTint, border: "1px solid " + BRAND.cyan,
+                        color: BRAND.cyanDeep, fontWeight: 600, whiteSpace: "nowrap" }}>
+                      JAMA #{c.n}{c.priority ? " ★" : ""}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div style={{ fontSize: 13, color: BRAND.grey11, fontStyle: "italic", padding: "0 4px" }}>No matches in the curriculum index.</div>
+      )}
+    </div>
+  );
+}
+
+function BrowseHub({ onOpenTile }) {
+  return (
+    <div style={{ flex: 1, overflowY: "auto", padding: "16px 14px 18px", WebkitOverflowScrolling: "touch" }}>
+      <div style={{ fontSize: 11, color: BRAND.grey11, textTransform: "uppercase", letterSpacing: 0.6, fontWeight: 700, padding: "0 4px 10px" }}>Browse the ASCEND curriculum</div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+        {BROWSE_HUB.map((tile) => (
+          <button key={tile.id} onClick={() => onOpenTile(tile)}
+            style={{ background: "#fff", border: "none", borderRadius: 14, padding: "16px 14px 18px", textAlign: "left", cursor: "pointer", display: "flex", flexDirection: "column", gap: 6, position: "relative", overflow: "hidden", minHeight: 118, gridColumn: tile.id === "legacy" ? "span 2" : "auto", boxShadow: "0 1px 2px rgba(14,26,42,0.04), 0 4px 14px rgba(14,26,42,0.04)", WebkitTapHighlightColor: "rgba(0,0,0,0.06)" }}>
+            <div style={{ position: "absolute", top: 0, right: 0, width: 70, height: 70, borderRadius: "0 14px 0 70px", background: tile.tint }}/>
+            <div style={{ width: 32, height: 32, borderRadius: 8, background: tile.color, color: "#fff", display: "grid", placeItems: "center", fontSize: 13, fontWeight: 700, letterSpacing: 0.4, fontFamily: "'JetBrains Mono', ui-monospace, monospace", position: "relative", zIndex: 1 }}>
+              {tile.glyph}
+            </div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: BRAND.ink, marginTop: 4, position: "relative", zIndex: 1 }}>{tile.label}</div>
+            <div style={{ fontSize: 11.5, color: BRAND.grey11, lineHeight: 1.35, position: "relative", zIndex: 1 }}>{tile.sub}</div>
+          </button>
+        ))}
+      </div>
+      <div style={{ marginTop: 16, padding: "12px 14px", background: "#fff", borderRadius: 12, fontSize: 12, color: BRAND.grey11, lineHeight: 1.5 }}>
+        <span style={{ color: BRAND.ink2, fontWeight: 600 }}>Tip:</span> type in the search bar above to jump straight to a session, module, MEPO, or MLO.
+      </div>
+    </div>
+  );
+}
+
+function BrowseLevel({ node, navPath, onTap, onBack, onHome, onJumpTo, nodeChildren }) {
+  const items = nodeChildren(node);
+  return (
+    <>
+      {/* Breadcrumb / back row */}
+      <div style={{ background: "#fff", borderBottom: "1px solid " + BRAND.grey2, padding: "8px 10px 8px 6px", display: "flex", alignItems: "center", gap: 6 }}>
+        <button onClick={onBack} style={{ background: "transparent", border: "none", padding: 6, cursor: "pointer", display: "grid", placeItems: "center", color: BRAND.ink, borderRadius: 8 }}>
+          <IconBack size={20} stroke={BRAND.ink} sw={2.2}/>
+        </button>
+        <div style={{ flex: 1, minWidth: 0, fontSize: 13, color: BRAND.ink, display: "flex", alignItems: "center", gap: 4, overflow: "hidden" }}>
+          <button onClick={onHome} style={{ background: "transparent", border: "none", color: BRAND.cyan, padding: 0, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", flexShrink: 0 }}>Browse</button>
+          {navPath.map((n, i) => {
+            const isLast = i === navPath.length - 1;
+            const jump = !isLast && onJumpTo ? () => onJumpTo(i) : null;
+            return (
+              <span key={n.id} style={{ display: "inline-flex", alignItems: "center", gap: 4, minWidth: 0 }}>
+                <IconChevR size={11} stroke={BRAND.grey3} sw={2.6}/>
+                {jump ? (
+                  <button onClick={jump}
+                    style={{ background: "transparent", border: "none", padding: 0, fontFamily: "inherit", fontSize: 13, fontWeight: 500, color: BRAND.cyan, cursor: "pointer", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "100%" }}>
+                    {n.label}
+                  </button>
+                ) : (
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: BRAND.ink, fontWeight: 600 }}>{n.label}</span>
+                )}
+              </span>
+            );
+          })}
+        </div>
+      </div>
+      <div style={{ flex: 1, overflowY: "auto", padding: "12px 14px 18px", WebkitOverflowScrolling: "touch" }}>
+        <div style={{ fontSize: 12, color: BRAND.grey11, padding: "0 4px 8px" }}>
+          {items.length} item{items.length === 1 ? "" : "s"}
+        </div>
+        {items.length === 0 ? (
+          <div style={{ background: "#fff", borderRadius: 12, padding: "32px 22px", textAlign: "center", color: BRAND.grey11, marginTop: 4, fontSize: 13 }}>
+            Nothing here yet.
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {items.map((it) => (
+              <BrowseItemRow key={it.id} item={it} onTap={() => onTap(it)}/>
+            ))}
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+function BrowseItemRow({ item, onTap }) {
+  const isPlaceholder = !!item.placeholder;
+  const hasChildren  = !!item.children;
+  const isModule     = !!item.moduleId;
+  const isSession    = !!item.sessionPayload;
+  const drillSession = !!item.sessionsFilter;
+  let stripe = BRAND.grey3;
+  if (isModule)        stripe = BRAND.cyan;
+  else if (drillSession) stripe = BRAND.violet;
+  else if (isSession)    stripe = BRAND.cyanDeep;
+  else if (hasChildren)  stripe = BRAND.violet;
+  return (
+    <button onClick={onTap}
+      style={{ background: "#fff", border: "none", borderRadius: 12, padding: 0, display: "flex", alignItems: "stretch", textAlign: "left", cursor: "pointer", boxShadow: "0 1px 2px rgba(0,0,0,0.05), 0 4px 12px rgba(0,0,0,0.03)", WebkitTapHighlightColor: "rgba(0,0,0,0.06)", overflow: "hidden", fontFamily: "inherit", width: "100%" }}>
+      <div style={{ width: 5, background: stripe, flex: "0 0 5px" }}/>
+      <div style={{ flex: 1, padding: "13px 12px 13px 14px", minWidth: 0, display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 14.5, fontWeight: 600, color: BRAND.ink, lineHeight: 1.3 }}>{item.label}</div>
+          {item.sub && <div style={{ fontSize: 12.5, color: BRAND.ink2, marginTop: 2, lineHeight: 1.4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.sub}</div>}
+          {item.meta && <div style={{ fontSize: 11, color: BRAND.grey11, marginTop: 4, fontWeight: 500 }}>{item.meta}</div>}
+          {isPlaceholder && !item.sub && <div style={{ fontSize: 11, color: BRAND.grey11, marginTop: 3, fontWeight: 500, fontStyle: "italic" }}>Placeholder · awaiting curriculum map</div>}
+        </div>
+        {hasChildren ? (
+          <div style={{ fontSize: 10.5, color: BRAND.violet, fontWeight: 700, letterSpacing: 0.4, padding: "3px 8px", background: BRAND.violetTint, borderRadius: 6, flexShrink: 0 }}>
+            {(item.children || []).length}
+          </div>
+        ) : null}
+        <IconChevR size={16} stroke={BRAND.grey3} sw={2.2}/>
+      </div>
+    </button>
+  );
+}
+
+function SearchResultsView({ results, filter, setFilter, counts, groups, filtered, onOpen }) {
+  return (
+    <>
+      {results.length > 0 && (
+        <div style={{ background: "#fff", borderBottom: "1px solid " + BRAND.grey2, padding: "8px 14px", display: "flex", gap: 6, overflowX: "auto" }}>
+          {["All", ...groups].map((k) => {
+            const on = filter === k;
+            const c = counts[k];
+            const total = k === "All" ? results.length : c;
+            if (k !== "All" && !total) return null;
+            return (
+              <button key={k} onClick={() => setFilter(k)}
+                style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "5px 11px", borderRadius: 999, whiteSpace: "nowrap",
+                  background: on ? BRAND.ink : "#fff", color: on ? "#fff" : BRAND.ink2,
+                  border: "1px solid " + (on ? BRAND.ink : BRAND.grey2),
+                  fontSize: 12.5, fontWeight: 500, cursor: "pointer", flexShrink: 0 }}>
+                {k}
+                {(total || 0) > 0 && <span style={{ fontSize: 11, fontWeight: 600, color: on ? "rgba(255,255,255,0.7)" : BRAND.grey11 }}>{total}</span>}
+              </button>
+            );
+          })}
+        </div>
+      )}
+      <div style={{ flex: 1, overflowY: "auto", padding: "10px 14px 16px", WebkitOverflowScrolling: "touch" }}>
+        {results.length === 0 ? (
+          <div style={{ background: "#fff", borderRadius: 12, padding: "32px 22px", textAlign: "center", color: BRAND.grey11, marginTop: 8 }}>
+            <div style={{ fontSize: 14, color: BRAND.ink, fontWeight: 600, marginBottom: 4 }}>No matches</div>
+            <div style={{ fontSize: 13 }}>Try different keywords — part of a session title, a MEPO number, or a module name.</div>
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, paddingBottom: 12 }}>
+            {filtered.slice(0, 80).map((r) => (
+              <SearchResultCard key={r.kind + ":" + r.id} item={r} onOpen={() => onOpen(r)}/>
+            ))}
+            {filtered.length > 80 && (
+              <div style={{ padding: "10px 6px", color: BRAND.grey11, fontSize: 12, textAlign: "center" }}>Showing top 80 of {filtered.length} — narrow with keywords.</div>
+            )}
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+function SearchResultCard({ item, onOpen }) {
+  const p = KIND_PALETTE[item.kind] || KIND_PALETTE.Module;
+  return (
+    <button onClick={onOpen}
+      style={{ background: "#fff", border: "none", borderRadius: 12, padding: "12px 14px", display: "flex", gap: 12, alignItems: "flex-start", textAlign: "left", cursor: "pointer", WebkitTapHighlightColor: "rgba(0,0,0,0.06)", boxShadow: "0 1px 2px rgba(0,0,0,0.04)" }}>
+      <div style={{ flex: "0 0 56px", textAlign: "center" }}>
+        <div style={{ display: "inline-block", padding: "3px 8px", background: p.tint, color: p.color, fontSize: 10, fontWeight: 700, letterSpacing: 0.4, textTransform: "uppercase", borderRadius: 5 }}>{p.label}</div>
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 14.5, fontWeight: 600, lineHeight: 1.25, color: BRAND.ink, marginBottom: 3 }}>{item.title}</div>
+        {item.sub && <div style={{ fontSize: 12.5, color: BRAND.ink2, lineHeight: 1.4, marginBottom: item.meta ? 4 : 0, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{item.sub}</div>}
+        {item.meta && <div style={{ fontSize: 11, color: BRAND.grey11, fontWeight: 500 }}>{item.meta}</div>}
+      </div>
+      <IconChevR size={14} stroke={BRAND.grey3} sw={2} style={{ marginTop: 4 }}/>
+    </button>
+  );
+}
+
+function SearchResultDetail({ item, onBack, onOpenItem }) {
+  const sans = "'Inter Tight', system-ui, sans-serif";
+  const p = KIND_PALETTE[item.kind] || KIND_PALETTE.Module;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", background: BRAND.bg, fontFamily: sans, color: BRAND.ink, overflow: "hidden" }}>
+      <div style={{ background: p.color, color: "#fff", paddingTop: "max(env(safe-area-inset-top, 12px), 12px)" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px 14px" }}>
+          <button onClick={onBack} style={{ width: 36, height: 36, borderRadius: 999, background: "rgba(255,255,255,0.18)", border: "none", color: "#fff", display: "grid", placeItems: "center", cursor: "pointer" }}>
+            <IconBack size={20} stroke="#fff" sw={2.2}/>
+          </button>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase", opacity: 0.85 }}>{p.label}</div>
+          <div style={{ width: 36 }}/>
+        </div>
+        <div style={{ padding: "0 18px 22px" }}>
+          <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: -0.4, lineHeight: 1.15 }}>{item.title}</div>
+          {item.sub && <div style={{ fontSize: 14, opacity: 0.92, marginTop: 6, lineHeight: 1.4 }}>{item.sub}</div>}
+          {item.meta && <div style={{ fontSize: 12.5, opacity: 0.85, marginTop: 8, fontWeight: 500 }}>{item.meta}</div>}
+        </div>
+      </div>
+
+      <div style={{ flex: 1, overflowY: "auto", padding: "16px 14px 18px", marginTop: -14, background: BRAND.bg, borderTopLeftRadius: 18, borderTopRightRadius: 18, WebkitOverflowScrolling: "touch" }}>
+        {item.kind === "Session"  && <SessionDetailBody item={item} onOpenItem={onOpenItem}/>}
+        {item.kind === "Module"   && <ModuleDetailBody  item={item} onOpenItem={onOpenItem}/>}
+        {item.kind === "MEPO"     && <MepoDetailBody    item={item} onOpenItem={onOpenItem}/>}
+        {item.kind === "MLO"      && <MloDetailBody     item={item}/>}
+      </div>
+    </div>
+  );
+}
+
+function SessionDetailBody({ item, onOpenItem }) {
+  const { session: s, moduleShort, moduleId, slos = [] } = item.payload || {};
+  if (!s) return null;
+  const S = window.SESSIONS || {};
+  const pack = (moduleId && S[moduleId]) || {};
+  const allMlos = pack.mlos || [];
+  const mod = window.CURRICULUM && window.CURRICULUM.MODULES.find(m => m.id === moduleId);
+
+  // Push a related session onto the same detail stack as the original.
+  // Mirrors the shape ModuleDetailBody's openSession() produces so the
+  // SearchResultDetail wrapper can render it identically.
+  function openRelated(entry) {
+    if (!onOpenItem) return;
+    const rs = entry.session;
+    const rmod = entry.mod;
+    const rSlos = (rs.objectives && rs.objectives.length)
+      ? rs.objectives.map((o) => o.text).filter(Boolean)
+      : (rs.slos || []).filter(Boolean);
+    onOpenItem({
+      kind: "Session", id: rs.id,
+      title: rs.title,
+      sub: (rmod.short || rmod.id) + (rs.week ? " · Week " + rs.week : "") + (rs.type ? " · " + rs.type : ""),
+      meta: [rs.duration ? rs.duration + " min" : null, rs.faculty].filter(Boolean).join(" · "),
+      payload: { session: rs, moduleId: rmod.id, moduleShort: rmod.short || rmod.id, slos: rSlos },
+    });
+  }
+
+  // Aligned MLOs: union over session.objectives[].mlos (1-based indices into pack.mlos)
+  const alignedMloIdx = new Set();
+  for (const o of (s.objectives || [])) for (const n of (o.mlos || [])) alignedMloIdx.add(n);
+  const alignedMlos = [...alignedMloIdx].sort((a, b) => a - b).map((n) => allMlos[n - 1]).filter(Boolean);
+
+  // Aligned MEPOs: union over each aligned MLO's `mepo` codes
+  const mepoSet = new Set();
+  for (const mlo of alignedMlos) for (const c of (mlo.mepo || mlo.mepos || [])) {
+    if (typeof c === "string" && /^MEPO\s+\d+$/i.test(c.trim())) mepoSet.add(c.trim());
+  }
+  const alignedMepoList = [...mepoSet].sort((a, b) => (parseInt(a.replace(/\D/g, "")) || 0) - (parseInt(b.replace(/\D/g, "")) || 0));
+  const C = window.CURRICULUM;
+  const mepoMeta = {};
+  for (const me of ((C && C.MEPOS) || [])) mepoMeta[me.code] = me;
+
+  // Related sessions (keyword-based, split into within-module and across-curriculum).
+  // Computed eagerly so each subsection card carries its own count badge.
+  const RS = window.RelatedSessions;
+  const related = (RS && RS.findRelatedSessions && mod)
+    ? RS.findRelatedSessions(s, mod.id, { keywordsOnly: true, maxWithin: 8, maxAcross: 8 })
+    : { within: [], across: [] };
+  const rsPalette = {
+    paper: BRAND.paper, grey1: BRAND.grey1, grey2: BRAND.grey2, grey3: BRAND.grey3,
+    grey8: BRAND.grey8, grey11: BRAND.grey11, ink: BRAND.ink, ink2: BRAND.ink2,
+    cyan: BRAND.cyan, cyanDeep: BRAND.cyanDeep, cyanTint: BRAND.cyanTint,
+  };
+  const rsModName = mod ? (mod.short || mod.name || "module") : "module";
+
+  return (
+    <>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 14 }}>
+        <StatTile label="Type"     value={s.type || "—"}/>
+        <StatTile label="Duration" value={s.duration ? s.duration + " min" : "—"}/>
+        <StatTile label="Week"     value={s.week != null ? "W" + s.week : "—"}/>
+      </div>
+      <InfoBlock label="Module">
+        <div style={{ fontSize: 14, fontWeight: 600, color: BRAND.ink, padding: "4px 0" }}>{moduleShort}</div>
+      </InfoBlock>
+      {s.faculty && (
+        <InfoBlock label="Faculty">
+          <div style={{ fontSize: 14, color: BRAND.ink2, padding: "4px 0", lineHeight: 1.4 }}>{s.faculty}</div>
+        </InfoBlock>
+      )}
+      {s.methods && (
+        <InfoBlock label="Methods">
+          <div style={{ fontSize: 13.5, color: BRAND.ink2, padding: "4px 0", lineHeight: 1.45 }}>{s.methods}</div>
+        </InfoBlock>
+      )}
+      {slos.length > 0 && (
+        <InfoBlock label={"Session learning objectives (SLOs) · " + slos.length}>
+          <ol style={{ margin: 0, padding: "6px 0 0 18px", color: BRAND.ink2, fontSize: 13.5, lineHeight: 1.5 }}>
+            {slos.map((o, i) => <li key={i} style={{ marginBottom: 6 }}>{o}</li>)}
+          </ol>
+        </InfoBlock>
+      )}
+
+      {/* Order (per design): MLO \u2192 Related Within \u2192 Related Across \u2192 Keywords \u2192 Aligned MEPOs */}
+
+      {alignedMlos.length > 0 && (
+        <CollapsibleInfoBlock label="Module learning objectives (MLOs)" count={alignedMlos.length} defaultOpen={false}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, paddingTop: 6 }}>
+            {alignedMlos.map((mlo) => (
+              <div key={mlo.code} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                <span style={{ fontFamily: "'JetBrains Mono', ui-monospace, monospace", color: BRAND.magenta, fontWeight: 700, fontSize: 11, flex: "0 0 48px", paddingTop: 1, letterSpacing: 0.3 }}>{mlo.code}</span>
+                <span style={{ flex: 1, fontSize: 13, color: BRAND.ink2, lineHeight: 1.45 }}>{mlo.text}</span>
+              </div>
+            ))}
+          </div>
+        </CollapsibleInfoBlock>
+      )}
+
+      {RS && RS.MobileRowList && mod && (
+        <CollapsibleInfoBlock label={`Related Sessions Within ${rsModName}`} count={related.within.length} defaultOpen={false}>
+          {React.createElement(RS.MobileRowList, {
+            items: related.within, showModuleBadge: false, onOpen: openRelated,
+            palette: rsPalette, emptyHint: `No other ${rsModName} sessions matched by keyword or SLO content.`,
+          })}
+        </CollapsibleInfoBlock>
+      )}
+
+      {RS && RS.MobileRowList && mod && (
+        <CollapsibleInfoBlock label="Related Sessions across ASCEND" count={related.across.length} defaultOpen={false}>
+          {React.createElement(RS.MobileRowList, {
+            items: related.across, showModuleBadge: true, onOpen: openRelated,
+            palette: rsPalette, emptyHint: "No matches in other curricular units yet.",
+          })}
+        </CollapsibleInfoBlock>
+      )}
+
+      {s.keywords && (
+        <CollapsibleInfoBlock label="Keywords" count={String(s.keywords).split(/[;,]/).map(k => k.trim()).filter(Boolean).length} defaultOpen={false}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 5, paddingTop: 6 }}>
+            {String(s.keywords).split(/[;,]/).map((k) => k.trim()).filter(Boolean).map((k) => (
+              <div key={k} style={{ fontSize: 11.5, padding: "3px 8px", background: BRAND.grey1, color: BRAND.ink2, borderRadius: 6, fontWeight: 500 }}>{k}</div>
+            ))}
+          </div>
+        </CollapsibleInfoBlock>
+      )}
+
+      {alignedMepoList.length > 0 && (
+        <CollapsibleInfoBlock label={"Aligned MEPOs · " + alignedMepoList.length} count={alignedMepoList.length} defaultOpen={false}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, paddingTop: 6 }}>
+            {alignedMepoList.map((code) => {
+              const me = mepoMeta[code];
+              return (
+                <div key={code} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                  <span style={{ fontFamily: "'JetBrains Mono', ui-monospace, monospace", color: BRAND.violet, fontWeight: 700, fontSize: 11, flex: "0 0 60px", paddingTop: 1, letterSpacing: 0.3 }}>{code}</span>
+                  <span style={{ flex: 1, fontSize: 13, color: BRAND.ink2, lineHeight: 1.45 }}>{me ? me.title : "—"}</span>
+                </div>
+              );
+            })}
+          </div>
+        </CollapsibleInfoBlock>
+      )}
+
+      {/* JAMA Nutrition Competencies — joined via window.jamaForSession;
+          shows the full Eisenberg et al. 2024 statement, not just the code. */}
+      {(() => {
+        if (!mod || typeof window.jamaForSession !== "function") return null;
+        const jamas = window.jamaForSession(mod.id, s.n);
+        if (!jamas || !jamas.length) return null;
+        const theme = (typeof window.jamaThemeForSession === "function")
+          ? window.jamaThemeForSession(mod.id, s.n) : "";
+        return (
+          <InfoBlock label={"JAMA Nutrition Competencies \u00b7 " + jamas.length}>
+            {theme && (
+              <div style={{ fontSize: 11.5, color: BRAND.grey11, fontStyle: "italic", paddingTop: 4 }}>
+                Eisenberg et al. 2024 \u00b7 {theme}
+              </div>
+            )}
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, paddingTop: 6 }}>
+              {jamas.map((c) => (
+                <div key={c.n} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                  <span style={{ fontFamily: "'JetBrains Mono', ui-monospace, monospace", color: BRAND.cyanDeep, fontWeight: 700, fontSize: 11, flex: "0 0 60px", paddingTop: 1, letterSpacing: 0.3 }}>JAMA #{c.n}{c.priority ? " \u2605" : ""}</span>
+                  <span style={{ flex: 1, fontSize: 13, color: BRAND.ink2, lineHeight: 1.45 }}>{c.text}</span>
+                </div>
+              ))}
+            </div>
+          </InfoBlock>
+        );
+      })()}
+    </>
+  );
+}
+function ModuleDetailBody({ item, onOpenItem }) {
+  const [summaryOpen, setSummaryOpen] = useStateMA(false);
+  const m = item.payload && item.payload.module;
+  if (!m) return null;
+  const S = window.SESSIONS || {};
+  const pack = S[m.id] || {};
+  const sessions = pack.sessions || [];
+  const mlos = pack.mlos || [];
+  const sessionCount = sessions.length;
+  const mloCount = mlos.length;
+  const moduleShort = m.short || m.id;
+  const phaseDisplay = m.phase === "Systems" ? "Organ Systems" : (m.phase || "—");
+
+  // Map each session's `methods` string + module context to a short code.
+  //   LEC  = Lecture                  CCSG = clinical-correlation small group
+  //          (Foundations / Organ Systems modules, excluding Anatomy)
+  //   LAB  = Laboratory               SGD  = Small-group discussion
+  //   PTP  = Patient presentation     ACS  = Anatomy clinical session (Anatomy
+  //                                          discussions only)
+  // Unmatched sessions fall into "Other".
+  function moduleTypeCode(s) {
+    const me = (s.methods || "").toLowerCase();
+    if (me.includes("lecture")) return "LEC";
+    if (me.includes("laboratory")) return "LAB";
+    if (me.includes("patient presentation")) return "PTP";
+    if (m.id === "anat" && (me.includes("discussion") || me.includes("large group"))) return "ACS";
+    if ((m.phase === "Foundations" || m.phase === "Systems") && m.id !== "anat"
+        && (me.includes("small group") || me.includes("(<12)") || me.includes("(>12)") || me.includes("discussion"))) return "CCSG";
+    if (me.includes("small group") || me.includes("(<12)") || me.includes("discussion") || me.includes("large group")) return "SGD";
+    return "Other";
+  }
+  const typeOrder = ["LEC", "CCSG", "LAB", "SGD", "PTP", "ACS", "Other"];
+  const typeCounts = Object.fromEntries(typeOrder.map((k) => [k, 0]));
+  let totalMinutes = 0;
+  for (const s of sessions) {
+    const code = moduleTypeCode(s);
+    if (typeCounts[code] == null) typeCounts[code] = 0;
+    typeCounts[code]++;
+    totalMinutes += typeof s.duration === "number" ? s.duration : 0;
+  }
+  // Render hours as e.g. "96 h" or "94.5 h" when there's a half-hour remainder.
+  const totalHours = totalMinutes / 60;
+  const hoursDisplay = totalMinutes ? (Math.round(totalHours * 2) / 2) + " h" : "—";
+
+  // Per-module director(s) lookup. We'll fill this in once user provides
+  // names; until then, falls back to "—".
+  const directors = (window.MODULE_DIRECTORS && window.MODULE_DIRECTORS[m.id]) || null;
+
+  function openSession(s) {
+    if (!onOpenItem) return;
+    const slos = (s.objectives && s.objectives.length)
+      ? s.objectives.map((o) => o.text).filter(Boolean)
+      : (s.slos || []).filter(Boolean);
+    onOpenItem({
+      kind: "Session", id: s.id,
+      title: s.title,
+      sub: moduleShort + (s.week ? " · Week " + s.week : "") + (s.type ? " · " + s.type : ""),
+      meta: [s.duration ? s.duration + " min" : null, s.faculty].filter(Boolean).join(" · "),
+      payload: { session: s, moduleId: m.id, moduleShort, slos },
+    });
+  }
+
+  return (
+    <>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 14 }}>
+        <StatTile label="Phase"            value={phaseDisplay}/>
+        <StatTile label="Year"             value={m.year  || "—"}/>
+        <StatTile label="Curricular Hours" value={hoursDisplay}/>
+      </div>
+      <button onClick={() => setSummaryOpen((v) => !v)}
+              style={{ background: "transparent", border: "none", padding: "8px 4px", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit", color: BRAND.cyanDeep, fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
+        {summaryOpen ? <IconChevD size={14} stroke={BRAND.cyanDeep} sw={2.4}/> : <IconChevR size={14} stroke={BRAND.cyanDeep} sw={2.4}/>}
+        {summaryOpen ? "Hide Module Summary" : "Show Module Summary"}
+      </button>
+      {summaryOpen && (
+        <InfoBlock label="Module summary">
+          <Row k="Full name"  v={m.name || "—"}/>
+          <Row k="Short code" v={moduleShort}/>
+          <Row k="Director(s)" v={directors || "—"} accent={directors ? null : null}/>
+          <Row k="# Sessions"  v={String(sessionCount)}/>
+          {/* Per-type session breakdown — only show types that occur in this module */}
+          {typeOrder.filter((k) => typeCounts[k] > 0).map((k) => (
+            <Row key={k} k={"# " + k} v={String(typeCounts[k])}/>
+          ))}
+          <Row k="# MLOs"      v={String(mloCount)}/>
+        </InfoBlock>
+      )}
+      {sessions.length > 0 ? (
+        <InfoBlock label={"Sessions · " + sessions.length}>
+          <div style={{ display: "flex", flexDirection: "column", paddingTop: 4 }}>
+            {sessions.map((s, i) => (
+              <button key={s.id || i} onClick={() => openSession(s)}
+                style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "11px 0", border: "none", background: "transparent", borderTop: i === 0 ? "none" : "1px solid " + BRAND.grey2, textAlign: "left", cursor: "pointer", width: "100%", fontFamily: "inherit", WebkitTapHighlightColor: "rgba(0,0,0,0.06)" }}>
+                <div style={{ flex: "0 0 52px", paddingTop: 2 }}>
+                  <div style={{ fontSize: 10, color: BRAND.grey11, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 700 }}>{s.week != null ? "Week " + s.week : "—"}</div>
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 600, color: BRAND.sessionTitle || "#0B3B7A", lineHeight: 1.35 }}>{s.title}</div>
+                  <div style={{ fontSize: 11.5, color: BRAND.grey11, marginTop: 3, fontWeight: 500 }}>
+                    {[moduleTypeCode(s), s.duration ? s.duration + " min" : null].filter((x) => x && x !== "Other").join(" · ") || "—"}
+                  </div>
+                </div>
+                <IconChevR size={14} stroke={BRAND.grey3} sw={2} style={{ marginTop: 4, flexShrink: 0 }}/>
+              </button>
+            ))}
+          </div>
+        </InfoBlock>
+      ) : (
+        <div style={{ background: "#fff", borderRadius: 12, padding: "16px 16px", marginBottom: 10, fontSize: 13, color: BRAND.grey11, lineHeight: 1.5 }}>
+          No session map available for this module yet.
+        </div>
+      )}
+      {mlos.length > 0 && (
+        <InfoBlock label={"Module learning objectives · " + mlos.length}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, paddingTop: 6 }}>
+            {mlos.map((mlo) => (
+              <div key={mlo.code} style={{ fontSize: 13, lineHeight: 1.45 }}>
+                <span style={{ fontFamily: "'JetBrains Mono', ui-monospace, monospace", color: BRAND.magenta, fontWeight: 700, fontSize: 11.5, marginRight: 6 }}>{mlo.code}</span>
+                <span style={{ color: BRAND.ink2 }}>{mlo.text}</span>
+              </div>
+            ))}
+          </div>
+        </InfoBlock>
+      )}
+    </>
+  );
+}
+function MepoDetailBody({ item, onOpenItem }) {
+  const me = item.payload && item.payload.mepo;
+  if (!me) return null;
+  const cov = getMepoCoverage(me.n);
+  const covMaps = getCoverageMaps();
+  // Build a per-module counts object from cov.modules array
+  const counts = {};
+  for (const entry of (cov.modules || [])) {
+    if (entry && typeof entry === "object") {
+      counts[entry.id || entry.moduleId || entry] = entry.sessionCount || entry.count || 1;
+    } else if (typeof entry === "string") {
+      counts[entry] = (counts[entry] || 0) + 1;
+    }
+  }
+  const totalSessions = covMaps.grandTotal || 0;
+  const pct = totalSessions ? (cov.sessionCount / totalSessions) * 100 : 0;
+
+  // Build the clickable session list: walk every module's session pack and
+  // pick sessions whose MLOs aggregate to this MEPO.
+  const sessions = [];
+  const C = window.CURRICULUM || {};
+  const S = window.SESSIONS || {};
+  for (const m of (C.MODULES || [])) {
+    const pack = S[m.id]; if (!pack) continue;
+    for (const s of (pack.sessions || [])) {
+      const mepoCodes = new Set((s.mepo || s.mepos || []).map(String));
+      if (mepoCodes.has(me.code) || mepoCodes.has("MEPO " + me.n) || mepoCodes.has(String(me.n))) {
+        sessions.push({ mod: m, session: s });
+      }
+    }
+  }
+  sessions.sort((a, b) => (a.mod.name || "").localeCompare(b.mod.name || "") || (a.session.title || "").localeCompare(b.session.title || ""));
+
+  return (
+    <>
+      <InfoBlock label="MEPO">
+        <Row k="Code"   v={me.code || "—"}/>
+        <Row k="Title"  v={me.title || "—"}/>
+        <Row k="Domain" v={me.domain || "—"}/>
+        {me.domainCode && <Row k="Domain code" v={me.domainCode}/>}
+        {me.description && (
+          <div style={{ paddingTop: 12, fontSize: 13.5, color: BRAND.ink2, lineHeight: 1.5 }}>{me.description}</div>
+        )}
+      </InfoBlock>
+      <InfoBlock label={"Coverage · " + pct.toFixed(1) + "%"}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 8, paddingTop: 4 }}>
+          <div style={{ fontSize: 28, fontWeight: 700, color: cov.sessionCount === 0 ? BRAND.bad : BRAND.violet, lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>{cov.sessionCount}</div>
+          <div style={{ fontSize: 12.5, color: BRAND.grey11 }}>session{cov.sessionCount === 1 ? "" : "s"} across {cov.moduleCount} module{cov.moduleCount === 1 ? "" : "s"}</div>
+        </div>
+        <div style={{ paddingTop: 10 }}>
+          <CovBar pct={pct} color={cov.sessionCount === 0 ? BRAND.bad : BRAND.violet} height={6}/>
+        </div>
+        {Object.keys(counts).length > 0 && (
+          <div style={{ paddingTop: 14 }}>
+            <div style={{ fontSize: 10.5, color: BRAND.grey11, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", marginBottom: 6 }}>Module heatmap</div>
+            <ModuleHeatmapRow counts={counts} color={BRAND.violet}/>
+          </div>
+        )}
+      </InfoBlock>
+      {sessions.length > 0 && (
+        <InfoBlock label={"Sessions · " + sessions.length}>
+          <div style={{ marginTop: 4, marginLeft: -8, marginRight: -8 }}>
+            {sessions.map((r, i) => {
+              const slos = (r.session.objectives && r.session.objectives.length)
+                ? r.session.objectives.map((o) => o.text || o.slo).filter(Boolean)
+                : (r.session.slos || []).filter(Boolean);
+              const sItem = {
+                kind: "Session", id: r.session.id,
+                title: r.session.title,
+                sub: `${r.mod.short || r.mod.id}${r.session.week ? " · Week " + r.session.week : ""}${r.session.type ? " · " + r.session.type : ""}`,
+                meta: r.session.duration ? r.session.duration + " min" : "",
+                session: r.session, moduleId: r.mod.id, moduleShort: r.mod.short || r.mod.id, slos,
+              };
+              return (
+              <button key={r.mod.id + ":" + (r.session.n || i)} onClick={() => onOpenItem && onOpenItem(sItem)}
+                style={{ display: "flex", flexDirection: "column", gap: 3, padding: "10px 8px", border: "none", background: "transparent", borderTop: i === 0 ? "1px solid " + BRAND.grey2 : "1px solid " + BRAND.grey2, textAlign: "left", cursor: "pointer", width: "100%", fontFamily: "inherit", WebkitTapHighlightColor: "rgba(0,0,0,0.06)" }}>
+                <div style={{ fontSize: 10.5, color: BRAND.grey11, fontWeight: 600, letterSpacing: 0.4, textTransform: "uppercase" }}>
+                  {r.mod.short || r.mod.name}{r.session.week ? " · Wk " + r.session.week : ""}
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ flex: 1, fontSize: 13.5, fontWeight: 600, color: BRAND.sessionTitle || "#0B3B7A", lineHeight: 1.3 }}>{r.session.title}</div>
+                  <IconChevR size={14} stroke={BRAND.grey3} sw={2}/>
+                </div>
+              </button>
+              );
+            })}
+          </div>
+        </InfoBlock>
+      )}
+    </>
+  );
+}
+function MloDetailBody({ item }) {
+  const { mlo, moduleShort } = item.payload || {};
+  if (!mlo) return null;
+  return (
+    <>
+      <InfoBlock label="MLO">
+        <Row k="Code"    v={mlo.code || "—"}/>
+        <Row k="Module"  v={moduleShort || "—"}/>
+      </InfoBlock>
+      <InfoBlock label="Objective">
+        <div style={{ padding: "6px 0", fontSize: 14, color: BRAND.ink, lineHeight: 1.5 }}>{mlo.text || "—"}</div>
+      </InfoBlock>
+      {(mlo.mepo || []).length > 0 && (
+        <InfoBlock label="Linked MEPOs">
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 5, paddingTop: 6 }}>
+            {(mlo.mepo || []).map((c) => (
+              <div key={c} style={{ fontSize: 11.5, padding: "3px 8px", background: BRAND.violetTint, color: BRAND.violet, borderRadius: 6, fontWeight: 600 }}>{c}</div>
+            ))}
+          </div>
+        </InfoBlock>
+      )}
+    </>
+  );
+}
+
+// ─── Sessions stub ────────────────────────────────────────────
+function SessionsStub() {
+  const sans = "'Inter Tight', system-ui, sans-serif";
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", background: BRAND.bg, fontFamily: sans, color: BRAND.ink, overflow: "hidden" }}>
+      <div style={{ background: IS_DIRECTORS ? "#C026D3" : BRAND.cyan, color: "#fff", paddingTop: "max(env(safe-area-inset-top, 12px), 12px)", paddingBottom: 18 }}>
+        <div style={{ padding: "10px 16px 4px", display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ width: 10, height: 10, borderRadius: 2, background: "#fff" }}/>
+          <div style={{ fontSize: 19, fontWeight: 600, letterSpacing: -0.2 }}>Sessions</div>
+        </div>
+        <div style={{ padding: "0 16px", fontSize: 13, opacity: 0.9, marginTop: 4 }}>Modules, sessions, MEPO trace</div>
+      </div>
+      <div style={{ flex: 1, padding: "40px 24px", textAlign: "center", color: BRAND.grey11, overflow: "auto" }}>
+        <div style={{ display: "grid", placeItems: "center", marginBottom: 14, color: BRAND.grey3 }}>
+          <IconCal size={44} stroke={BRAND.grey3} sw={1.5}/>
+        </div>
+        <div style={{ fontSize: 16, fontWeight: 600, color: BRAND.ink, marginBottom: 8 }}>Best viewed on desktop</div>
+        <div style={{ fontSize: 14, lineHeight: 1.5, maxWidth: 280, margin: "0 auto" }}>
+          The session map and MEPO trace are dense and work better on a larger screen. Open this dashboard on a laptop to dig in.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── MEPO list tab ────────────────────────────────────────────
+// Replaces the old "Me / Profile" tab. Shows all canonical MEPOs grouped by
+// domain; tapping one opens it in the shared MEPO detail view (via
+// SearchResultDetail with kind=MEPO).
+function MepoListTab({ onOpenMepo }) {
+  const sans = "'Inter Tight', system-ui, sans-serif";
+  const mepos = (window.CURRICULUM && window.CURRICULUM.MEPOS) || [];
+  const leadership = window.CA_LEADERSHIP || [];
+  const groups = useMemoMA(() => {
+    const map = new Map();
+    for (const me of mepos) {
+      const key = me.domain || "—";
+      if (!map.has(key)) map.set(key, { domain: key, domainCode: me.domainCode, items: [] });
+      map.get(key).items.push(me);
+    }
+    return [...map.values()];
+  }, [mepos]);
+
+  // Build a name's initials for the leadership avatar circle.
+  function initials(name) {
+    const tokens = (name || "").split(/\s+/).filter((w) => /^[A-Za-z(]/.test(w));
+    return tokens.slice(0, 2).map((w) => (w.replace(/[^A-Za-z]/g, "")[0] || "")).join("").toUpperCase();
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", background: BRAND.bg, fontFamily: sans, color: BRAND.ink, overflow: "hidden" }}>
+      <div style={{ background: BRAND.violet, color: "#fff", paddingTop: "max(env(safe-area-inset-top, 12px), 12px)", paddingBottom: 18 }}>
+        <div style={{ padding: "10px 16px 4px", display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ width: 10, height: 10, borderRadius: 2, background: "#fff" }}/>
+          <div style={{ fontSize: 19, fontWeight: 600, letterSpacing: -0.2 }}>MEPOs · Curricular Leadership</div>
+        </div>
+        <div style={{ padding: "0 16px", fontSize: 13, opacity: 0.9, marginTop: 4 }}>
+          {mepos.length} canonical MEPOs · {leadership.length} leadership
+        </div>
+      </div>
+      <div style={{ flex: 1, overflowY: "auto", padding: "14px 14px 18px", WebkitOverflowScrolling: "touch" }}>
+        {/* 23 canonical MEPOs — listed first */}
+        <div style={{ fontSize: 11, color: BRAND.grey11, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700, padding: "4px 4px 8px" }}>
+          Medical Education Program Objectives
+        </div>
+        {groups.length === 0 ? (
+          <div style={{ background: "#fff", borderRadius: 12, padding: "32px 20px", textAlign: "center", color: BRAND.grey11 }}>
+            MEPOs not loaded.
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 16, marginBottom: 20 }}>
+            {groups.map((g) => (
+              <div key={g.domain}>
+                <div style={{ fontSize: 11, color: BRAND.grey11, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700, padding: "4px 4px 8px" }}>
+                  {g.domainCode ? g.domainCode + " · " : ""}{g.domain}
+                </div>
+                <div style={{ background: "#fff", borderRadius: 12, overflow: "hidden", boxShadow: "0 1px 2px rgba(0,0,0,0.04)" }}>
+                  {g.items.map((me, i) => {
+                    const cov = getMepoCoverage(me.n);
+                    const cv = window.CURRICULUM || {};
+                    const totalSessions = (cv.MEPO_STATS_TOTAL_SESSIONS) ||
+                      (cv.MODULES || []).reduce((n, m) => n + (((window.SESSIONS || {})[m.id] || {}).sessions || []).length, 0);
+                    const pct = totalSessions ? (cov.sessionCount / totalSessions) * 100 : 0;
+                    return (
+                    <button key={me.code} onClick={() => onOpenMepo(me)}
+                      style={{ display: "flex", flexDirection: "column", gap: 6, padding: "12px 14px", border: "none", background: "transparent", borderTop: i === 0 ? "none" : "1px solid " + BRAND.grey2, textAlign: "left", cursor: "pointer", width: "100%", fontFamily: "inherit", WebkitTapHighlightColor: "rgba(0,0,0,0.06)" }}>
+                      <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                        <div style={{ flex: "0 0 60px", fontFamily: "'JetBrains Mono', ui-monospace, monospace", fontSize: 11, color: BRAND.violet, fontWeight: 700, letterSpacing: 0.3, paddingTop: 1 }}>{me.code}</div>
+                        <div style={{ flex: 1, fontSize: 13.5, color: BRAND.ink, lineHeight: 1.45 }}>{me.title}</div>
+                        <div style={{ flex: "0 0 auto", fontSize: 11, fontWeight: 700, color: cov.sessionCount === 0 ? BRAND.bad : (pct < 1 ? BRAND.grey11 : BRAND.violet), fontVariantNumeric: "tabular-nums", paddingTop: 1 }}>{pct.toFixed(1)}%</div>
+                        <IconChevR size={14} stroke={BRAND.grey3} sw={2} style={{ marginTop: 4, flexShrink: 0 }}/>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, paddingLeft: 70 }}>
+                        <CovBar pct={pct} color={cov.sessionCount === 0 ? BRAND.bad : BRAND.violet}/>
+                        <div style={{ flex: "0 0 auto", fontSize: 10.5, color: BRAND.grey11, fontWeight: 600, whiteSpace: "nowrap" }}>
+                          {cov.sessionCount} session{cov.sessionCount === 1 ? "" : "s"} · {cov.moduleCount} module{cov.moduleCount === 1 ? "" : "s"}
+                        </div>
+                      </div>
+                    </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Curricular Leadership — listed second */}
+        {leadership.length > 0 && (
+          <div style={{ marginBottom: 4 }}>
+            <div style={{ fontSize: 11, color: BRAND.grey11, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700, padding: "4px 4px 8px" }}>
+              Curricular Leadership
+            </div>
+            <div style={{ background: "#fff", borderRadius: 12, overflow: "hidden", boxShadow: "0 1px 2px rgba(0,0,0,0.04)" }}>
+              {leadership.map((p, i) => (
+                <div key={p.name} style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 14px", borderTop: i === 0 ? "none" : "1px solid " + BRAND.grey2 }}>
+                  <div style={{ width: 34, height: 34, borderRadius: 999, background: BRAND.violetTint, color: BRAND.violet, display: "grid", placeItems: "center", fontSize: 12, fontWeight: 700, flexShrink: 0, letterSpacing: 0.4 }}>
+                    {initials(p.name)}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: BRAND.ink, lineHeight: 1.3 }}>{p.name}</div>
+                    <div style={{ fontSize: 12.5, color: BRAND.ink2, marginTop: 2, lineHeight: 1.4 }}>{p.role}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Placeholder detail ───────────────────────────────────────
+// Generic detail screen for browse-hub items whose curriculum data hasn't
+// been ingested yet (clerkships, AIs, transitions). Surfaces the breadcrumb
+// so the user knows where they came from, plus a standardized summary card
+// matching the Phase 1 module-detail layout: Phase / Year / Curricular Hours
+// stat tiles + a per-kind summary (Clerkship / Acting Internship / Activity).
+function PlaceholderDetail({ data, onBack }) {
+  const [summaryOpen, setSummaryOpen] = useStateMA(false);
+  const sans = "'Inter Tight', system-ui, sans-serif";
+  const crumb = (data.breadcrumb || []).slice(0, -1).join(" · ");
+  const meta = (data.item && data.item.id && window.PLACEHOLDER_META && window.PLACEHOLDER_META[data.item.id]) || {};
+  const kind = meta.kind || "activity";
+  const accent = data.color || (kind === "ai" ? BRAND.violet : kind === "clerkship" ? BRAND.magenta : BRAND.cyanDeep);
+  const summaryLabel =
+    kind === "ai"        ? "Acting Internship Summary" :
+    kind === "clerkship" ? "Clerkship Summary" :
+    kind === "module"    ? "Module Summary" :
+                           "Activity Summary";
+  const kindEyebrow =
+    kind === "ai"        ? "Acting Internship" :
+    kind === "clerkship" ? "Clerkship" :
+    kind === "module"    ? "Module" :
+                           "Activity";
+  const showSites  = kind === "ai" || kind === "clerkship";
+  const phaseLabel = meta.phase || "—";
+  const yearLabel  = meta.year || "—";
+  const weeksLabel = meta.weeks ? meta.weeks + " wk" : "—";
+  const directors  = meta.directors || "—";
+  const shortCode  = meta.shortCode || "—";
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", background: BRAND.bg, fontFamily: sans, color: BRAND.ink, overflow: "hidden" }}>
+      <div style={{ background: accent, color: "#fff", paddingTop: "max(env(safe-area-inset-top, 12px), 12px)" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px 14px" }}>
+          <button onClick={onBack} style={{ width: 36, height: 36, borderRadius: 999, background: "rgba(255,255,255,0.18)", border: "none", color: "#fff", display: "grid", placeItems: "center", cursor: "pointer" }}>
+            <IconBack size={20} stroke="#fff" sw={2.2}/>
+          </button>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase", opacity: 0.85 }}>
+            {kindEyebrow}
+          </div>
+          <div style={{ width: 36 }}/>
+        </div>
+        <div style={{ padding: "0 18px 22px" }}>
+          {crumb && <div style={{ fontSize: 12, opacity: 0.85, marginBottom: 6 }}>{crumb}</div>}
+          <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: -0.4, lineHeight: 1.15 }}>{data.label}</div>
+        </div>
+      </div>
+      <div style={{ flex: 1, overflowY: "auto", padding: "16px 14px 18px", marginTop: -14, background: BRAND.bg, borderTopLeftRadius: 18, borderTopRightRadius: 18, WebkitOverflowScrolling: "touch" }}>
+        {/* Stat tiles: Phase / Year / Curricular Weeks */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 14 }}>
+          <StatTile label="Phase"            value={phaseLabel}/>
+          <StatTile label="Year"             value={yearLabel}/>
+          <StatTile label="Curricular Weeks" value={weeksLabel}/>
+        </div>
+
+        {/* Collapsible summary */}
+        <button onClick={() => setSummaryOpen((v) => !v)}
+                style={{ background: "transparent", border: "none", padding: "8px 4px", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit", color: BRAND.cyanDeep, fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
+          {summaryOpen ? <IconChevD size={14} stroke={BRAND.cyanDeep} sw={2.4}/> : <IconChevR size={14} stroke={BRAND.cyanDeep} sw={2.4}/>}
+          {summaryOpen ? "Hide " + summaryLabel : "Show " + summaryLabel}
+        </button>
+        {summaryOpen && (
+          <InfoBlock label={summaryLabel}>
+            <Row k="Full name"    v={data.label}/>
+            <Row k="Short code"   v={shortCode}/>
+            <Row k="Director(s)"  v={directors}/>
+            {showSites && <Row k="# RCEs"         v="—"/>}
+            {showSites && <Row k="Clinical sites" v="—"/>}
+          </InfoBlock>
+        )}
+
+        <div style={{ background: "#fff", borderRadius: 12, padding: "14px 16px", fontSize: 12, color: BRAND.grey11, lineHeight: 1.5 }}>
+          <span style={{ color: BRAND.ink2, fontWeight: 600 }}>Awaiting curriculum map.</span>{" "}
+          Sessions, MLOs, and MEPO alignment for {data.label} will appear here once ingested.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Pull-to-refresh wrapper ──────────────────────────────────
+function PullToRefresh({ onRefresh, children }) {
+  const [pull, setPull] = useStateMA(0);
+  const [refreshing, setRefreshing] = useStateMA(false);
+  const startY = useRefMA(0);
+  const wrapRef = useRefMA(null);
+
+  function onTouchStart(e) {
+    if (wrapRef.current && wrapRef.current.scrollTop <= 0) startY.current = e.touches[0].clientY;
+    else startY.current = -1;
+  }
+  function onTouchMove(e) {
+    if (startY.current < 0) return;
+    const dy = e.touches[0].clientY - startY.current;
+    if (dy > 0) setPull(Math.min(dy * 0.5, 90));
+  }
+  function onTouchEnd() {
+    if (pull > 60 && !refreshing) {
+      setRefreshing(true);
+      Promise.resolve(onRefresh && onRefresh()).then(() => { setTimeout(() => { setRefreshing(false); setPull(0); }, 400); });
+    } else setPull(0);
+    startY.current = -1;
+  }
+  return (
+    <div ref={wrapRef} onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
+         style={{ height: "100%", overflow: "hidden", position: "relative" }}>
+      <div style={{ position: "absolute", top: pull - 30, left: 0, right: 0, display: "grid", placeItems: "center", height: 30, color: BRAND.cyan, transition: refreshing ? "none" : "top .2s" }}>
+        <IconRefresh size={20} stroke={BRAND.cyan} sw={2.2} style={{ transform: `rotate(${pull * 4}deg)`, transition: refreshing ? "transform .8s linear infinite" : "none" }}/>
+      </div>
+      <div style={{ height: "100%", transform: `translateY(${pull}px)`, transition: refreshing ? "none" : "transform .2s" }}>{children}</div>
+    </div>
+  );
+}
+
+// ─── Root mobile app ──────────────────────────────────────────
+function MobileApp() {
+  const [tab, setTab] = useStateMA("search");
+  const [detailCode, setDetailCode] = useStateMA(null);
+  const [resultStack, setResultStack] = useStateMA([]); // stack of search-result items (drill-down)
+  const [filtersOpen, setFiltersOpen] = useStateMA(false);
+  const [savedSet, setSavedSet] = useStateMA(loadSaved());
+  const [refreshNonce, setRefreshNonce] = useStateMA(0);
+
+  // Search/browse state lifted out of CurriculumSearch so it survives when
+  // MobileApp swaps in a SearchResultDetail and back. Without this, opening a
+  // session from Curricular Threads then hitting Back would unmount the search
+  // component and the user would land back on the browse hub.
+  const [searchQ, setSearchQ] = useStateMA("");
+  const [searchNavPath, setSearchNavPath] = useStateMA([]);
+  const [searchFilter, setSearchFilter] = useStateMA("All");
+
+  // Ask-ASCEND state — lifted for the same reason: a user can open a session
+  // from a natural-language pick, then hit back, and expect to see the same
+  // answer list rather than landing on the search hub.
+  const [askMode, setAskMode] = useStateMA(false);
+  const [askLoading, setAskLoading] = useStateMA(false);
+  const [askResult, setAskResult] = useStateMA(null);
+  const [askError, setAskError] = useStateMA(null);
+  async function runAsk(query) {
+    const text = (query || "").trim();
+    if (!text) return;
+    if (!window.AskAscend || !window.AskAscend.askAscend) {
+      setAskError("Ask ASCEND not available. (ask-ascend.js failed to load.)");
+      return;
+    }
+    setAskLoading(true); setAskError(null); setAskResult(null);
+    try {
+      const audience = window.STUDENT_VIEW ? "student" : "both";
+      const res = await window.AskAscend.askAscend(text, { audience });
+      setAskResult(res);
+    } catch (e) {
+      setAskError(String(e && e.message ? e.message : e));
+    } finally {
+      setAskLoading(false);
+    }
+  }
+
+  function toggleSave(code) {
+    setSavedSet((prev) => {
+      const next = new Set(prev);
+      if (next.has(code)) next.delete(code); else next.add(code);
+      persistSaved(next);
+      return next;
+    });
+  }
+
+  const [placeholder, setPlaceholder] = useStateMA(null);
+
+  // Result-stack helpers: push to drill deeper (module → session), pop on Back.
+  function pushResult(it) { setResultStack((s) => [...s, it]); }
+  function popResult()    { setResultStack((s) => s.slice(0, -1)); }
+  const topResult = resultStack.length ? resultStack[resultStack.length - 1] : null;
+
+  // Switching tabs clears any open detail/placeholder so the user lands on a
+  // fresh tab root. The bottom tab bar is always visible (sticky) — tapping
+  // a tab is the user's way out of a detail view even if they don't hit Back.
+  function switchTab(next) {
+    setTab(next);
+    setDetailCode(null);
+    setResultStack([]);
+    setPlaceholder(null);
+    // Clear search state when leaving / re-entering the search tab so the
+    // user lands on a fresh search root (only when switching away from it).
+    if (next !== "search") {
+      setSearchQ("");
+      setSearchNavPath([]);
+      setAskMode(false);
+      setAskResult(null);
+      setAskError(null);
+    }
+  }
+
+  function openMepoFromList(me) {
+    pushResult({
+      kind: "MEPO", id: me.code,
+      title: me.code, sub: me.title || "",
+      meta: [me.domainCode, me.domain].filter(Boolean).join(" · "),
+      payload: { mepo: me },
+    });
+  }
+
+  // Body content
+  let body;
+  if (detailCode) {
+    body = <ElectiveDetail code={detailCode} onBack={() => setDetailCode(null)} saved={savedSet.has(detailCode)} onToggleSave={() => toggleSave(detailCode)}/>;
+  } else if (placeholder) {
+    body = <PlaceholderDetail data={placeholder} onBack={() => setPlaceholder(null)}/>;
+  } else if (topResult) {
+    body = <SearchResultDetail item={topResult} onBack={popResult} onOpenItem={pushResult}/>;
+  } else if (tab === "electives") {
+    body = (
+      <PullToRefresh key={refreshNonce} onRefresh={() => setRefreshNonce((n) => n + 1)}>
+        <ElectivesList onOpen={(code) => setDetailCode(code)} onOpenFilters={() => setFiltersOpen(true)} savedSet={savedSet} onToggleSave={toggleSave}/>
+      </PullToRefresh>
+    );
+  } else if (tab === "search") {
+    body = <CurriculumSearch
+      q={searchQ} setQ={setSearchQ}
+      navPath={searchNavPath} setNavPath={setSearchNavPath}
+      filter={searchFilter} setFilter={setSearchFilter}
+      askMode={askMode} setAskMode={setAskMode}
+      askLoading={askLoading} askResult={askResult} askError={askError}
+      onAsk={runAsk}
+      onOpenResult={pushResult} onOpenPlaceholder={(p) => setPlaceholder(p)}/>;
+  } else if (tab === "saved") {
+    body = <SavedList savedSet={savedSet} onOpen={(code) => setDetailCode(code)} onToggleSave={toggleSave} onGoBrowse={() => switchTab("electives")}/>;
+  } else if (tab === "mepo") {
+    body = <MepoListTab onOpenMepo={openMepoFromList}/>;
+  } else if (tab === "directory") {
+    body = <MobileDirectoryTab/>;
+  } else if (tab === "aocthreads") {
+    body = <MobileAocThreadsTab onOpenSession={pushResult}/>;
+  } else if (tab === "calendar") {
+    body = <MobileCalendarTab/>;
+  }
+
+  return (
+    <div style={{ height: "100%", display: "flex", flexDirection: "column", background: BRAND.bg, overflow: "hidden", position: "relative" }}>
+      <div style={{ position: "absolute", inset: 0, paddingBottom: "calc(env(safe-area-inset-bottom, 18px) + 56px)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <div style={{ flex: 1, minHeight: 0, position: "relative", display: "flex", flexDirection: "column" }}>{body}</div>
+      </div>
+      <MobileTabBar active={tab} onChange={switchTab} savedCount={savedSet.size}/>
+      <FilterSheet open={filtersOpen} onClose={() => setFiltersOpen(false)}/>
+    </div>
+  );
+}
+
+window.MobileApp = MobileApp;
+
+})();
+
+function DirectorsRouter() {
+  const params = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+  const override = params && params.get("view");
+  const getIsMobile = () => {
+    if (override === "mobile") return true;
+    if (override === "desktop") return false;
+    return typeof window !== "undefined" && window.innerWidth < 768;
+  };
+  const [isMobile, setIsMobile] = React.useState(getIsMobile);
+  React.useEffect(() => {
+    if (override) return;
+    const onResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  React.useEffect(() => {
+    const html = document.documentElement, body = document.body;
+    const root = document.getElementById("root");
+    if (isMobile) {
+      html.style.overflow = "hidden"; body.style.overflow = "hidden";
+      if (root) root.style.height = "100vh";
+      body.style.margin = "0"; body.style.padding = "0"; body.style.background = "#F5F7FA";
+      body.style.overscrollBehavior = "none";
+      body.style.fontFamily = "'Inter Tight', system-ui, sans-serif";
+    } else {
+      html.style.overflow = ""; body.style.overflow = "";
+      if (root) root.style.height = "";
+      body.style.margin = ""; body.style.padding = ""; body.style.background = ""; body.style.overscrollBehavior = ""; body.style.fontFamily = "";
+    }
+  }, [isMobile]);
+  return isMobile ? <window.MobileApp /> : <window.AppShell />;
+}
+ReactDOM.createRoot(document.getElementById("root")).render(<DirectorsRouter />);
   </script>
   <script type="text/babel" data-presets="env,react" src="related-sessions.js"></script>
 </body>
