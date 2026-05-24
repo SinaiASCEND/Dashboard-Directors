@@ -41711,8 +41711,8 @@ function MobileCalendarTab() {
       // Rotated square — needs an inner wrapper for un-rotated text.
       return (
         <span style={{ position: "relative", display: "inline-grid", placeItems: "center", width: 22, height: 22, flexShrink: 0 }}>
-          <span style={{ width: 16, height: 16, background: p.bg, border: "1.5px solid " + p.color, transform: "rotate(45deg)", borderRadius: 2 }}/>
-          <span style={{ position: "absolute", fontSize: 9, fontWeight: 700, color: p.color, letterSpacing: 0.2 }}>{cls}</span>
+          <span style={{ gridArea: "1 / 1", width: 16, height: 16, background: p.bg, border: "1.5px solid " + p.color, transform: "rotate(45deg)", borderRadius: 2 }}/>
+          <span style={{ gridArea: "1 / 1", fontSize: 9, fontWeight: 700, color: p.color, letterSpacing: 0.2, lineHeight: 1 }}>{cls}</span>
         </span>
       );
     }
