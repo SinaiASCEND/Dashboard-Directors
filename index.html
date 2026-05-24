@@ -35794,10 +35794,6 @@ function GlobalSearch({ open, onClose }) {
 
   function onKeyTypeahead(e) {
     if (e.key === "Escape") { onClose(); return; }
-    if (askMode) {
-      if (e.key === "Enter") { e.preventDefault(); runAsk(); }
-      return;
-    }
     if (e.key === "ArrowDown") {
       e.preventDefault();
       setActiveIdx((i) => Math.min(i + 1, liveResults.length - 1));
@@ -35806,7 +35802,6 @@ function GlobalSearch({ open, onClose }) {
       setActiveIdx((i) => Math.max(i - 1, 0));
     } else if (e.key === "Enter") {
       e.preventDefault();
-      // Enter always commits to the results page (per requested UX).
       commitSearch();
     }
   }
@@ -35835,15 +35830,7 @@ function GlobalSearch({ open, onClose }) {
         fontFamily: "var(--font-sans)",
       }}
       onClick={() => {
-        // Outside-click dismiss policy:
-        // 1. If a session detail panel is open, close just that panel.
-        // 2. If Ask ASCEND has loaded, errored, or is mid-flight, KEEP the
-        //    modal open — users invested a query and shouldn't lose results
-        //    by tapping outside the dialog. They close explicitly via the
-        //    X button (or Esc).
-        // 3. Otherwise (typeahead with no committed work), dismiss as usual.
         if (detailSession) { setDetailSession(null); return; }
-        if (askLoading || askResult || askError) return;
         if (view === "results" && pageResults.length > 0) return;
         onClose();
       }}
@@ -35968,13 +35955,10 @@ function runSearch(index, q, forResultsPage) {
 // Header (search input + actions)
 // ---------------------------------------------------------------------------
 
-function SearchHeader({ inputRef, q, setQ, onKey, view, onSubmit, onBackToTypeahead, onClose, askMode, onToggleAsk }) {
-  const placeholder = askMode
-    ? "Ask anything about the ASCEND curriculum…"
-    : "Search sessions, modules, MEPOs, MLOs…";
+function SearchHeader({ inputRef, q, setQ, onKey, view, onSubmit, onBackToTypeahead, onClose }) {
   return (
     <div style={{ padding: "14px 18px", borderBottom: "1px solid var(--grey-3)", display: "flex", alignItems: "center", gap: 10 }}>
-      {(view === "results" || view === "ask") && (
+      {view === "results" && (
         <button
           onClick={onBackToTypeahead}
           title="Back"
@@ -35984,46 +35968,21 @@ function SearchHeader({ inputRef, q, setQ, onKey, view, onSubmit, onBackToTypeah
           </svg>
         </button>
       )}
-      {askMode ? (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--brand-cyan-deep)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round">
-          <path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6L12 3z"/>
-          <path d="M19 14l.8 2.2L22 17l-2.2.8L19 20l-.8-2.2L16 17l2.2-.8L19 14z"/>
-        </svg>
-      ) : (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--grey-11)" strokeWidth="2">
-          <circle cx="11" cy="11" r="7" />
-          <path d="m21 21-4.3-4.3" />
-        </svg>
-      )}
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--grey-11)" strokeWidth="2">
+        <circle cx="11" cy="11" r="7" />
+        <path d="m21 21-4.3-4.3" />
+      </svg>
       <input
         ref={inputRef}
         value={q}
         onChange={(e) => setQ(e.target.value)}
         onKeyDown={onKey}
-        placeholder={placeholder}
+        placeholder="Search sessions, modules, MEPOs, MLOs…"
         style={{
           flex: 1, fontSize: 14, fontFamily: "var(--font-sans)",
           border: "none", outline: "none", background: "transparent",
         }}
       />
-      {onToggleAsk && (
-        <button
-          onClick={onToggleAsk}
-          title={askMode ? "Back to keyword search" : "Ask ASCEND — natural-language search"}
-          style={{
-            fontSize: 11, fontWeight: 600, padding: "6px 10px", borderRadius: 5,
-            border: "1px solid " + (askMode ? "var(--brand-cyan-deep)" : "var(--grey-3)"),
-            background: askMode ? "var(--brand-cyan-tint)" : "var(--paper)",
-            color: askMode ? "var(--brand-cyan-deep)" : "var(--grey-11)",
-            cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5,
-            letterSpacing: "0.04em",
-          }}>
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 2.5l1.9 5.3L19 9.7l-5.1 1.9L12 17l-1.9-5.4L5 9.7l5.1-1.9L12 2.5z"/>
-          </svg>
-          Ask ASCEND
-        </button>
-      )}
       <button
         onClick={onSubmit}
         disabled={!q.trim()}
@@ -40265,7 +40224,15 @@ function VariantE() {
   }, [all]);
 
   const filtered = useMemoE(() => {
-    const source = askResult && askResult.picks ? askResult.picks : all;
+    const tokens = q.toLowerCase().split(/\s+/).filter(Boolean);
+    const matchToken = (e, t) => {
+      const hay = [
+        e.code, e.title, e.specialty, e.type, e.keywords,
+        e.residencyTracks, e.sites, e.clinicalSetting, e.intensity,
+        e.yearEligibility, e.erasCategory,
+      ].join(" ").toLowerCase();
+      return hay.includes(t);
+    };
     const inMulti = (val, target, split) => {
       if (target === "All") return true;
       if (!val) return false;
@@ -40273,7 +40240,8 @@ function VariantE() {
       return val === target;
     };
 
-    let list = source.filter(e => {
+    let list = all.filter(e => {
+      if (tokens.length && !tokens.every(t => matchToken(e, t))) return false;
       if (!inMulti(e.specialty, filterSpecialty)) return false;
       if (!inMulti(e.type, filterType)) return false;
       if (!inMulti(e.yearEligibility, filterYear, ",")) return false;
@@ -40295,9 +40263,9 @@ function VariantE() {
     // "relevance" — sheet order
 
     return list;
-  }, [all, askResult, filterSpecialty, filterType, filterYear, filterSetting, filterIntensity, filterAudition, filterSite, filterDuration, sortBy]);
+  }, [all, q, filterSpecialty, filterType, filterYear, filterSetting, filterIntensity, filterAudition, filterSite, filterDuration, sortBy]);
 
-  const activeFilters = [filterSpecialty, filterType, filterYear, filterSetting, filterIntensity, filterAudition, filterSite, filterDuration].filter(v => v !== "All").length + (askResult ? 1 : 0);
+  const activeFilters = [filterSpecialty, filterType, filterYear, filterSetting, filterIntensity, filterAudition, filterSite, filterDuration].filter(v => v !== "All").length + (q ? 1 : 0);
 
   function clearAll() {
     setQ(""); setAskQuery(""); setAskResult(null); setAskError(null);
@@ -40361,55 +40329,30 @@ function VariantE() {
             </div>
           </div>
 
-          {/* Search bar — natural-language Ask ASCEND, scoped to the elective catalog */}
-          <div style={{ marginTop: 16, marginBottom: 16, display: "flex", gap: 10, alignItems: "center", background: "var(--paper)", padding: "10px 14px", border: "1px solid " + (askResult || askLoading ? "var(--brand-cyan)" : "var(--grey-3)"), borderRadius: 8 }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="var(--brand-cyan-deep)">
-              <path d="M12 2.5l1.9 5.3L19 9.7l-5.1 1.9L12 17l-1.9-5.4L5 9.7l5.1-1.9L12 2.5z"/>
+          {/* Search bar */}
+          <div style={{ marginTop: 16, marginBottom: 16, display: "flex", gap: 10, alignItems: "center", background: "var(--paper)", padding: "10px 14px", border: "1px solid var(--grey-3)", borderRadius: 8 }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--grey-11)" strokeWidth="2">
+              <circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" />
             </svg>
             <input
               value={q}
               onChange={e => setQ(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); runAsk(); } }}
-              placeholder="Ask the catalog — try “something 2 weeks at the VA” or “oncology research electives”…"
+              placeholder="Search electives — try “surgery”, “VA”, “anesthesia”, “OR”…"
               style={{ flex: 1, fontSize: 14, fontFamily: "var(--font-sans)", border: "none", outline: "none", background: "transparent" }}
             />
             {q && (
-              <button onClick={clearAsk} title="Clear" style={{ background: "transparent", border: "none", cursor: "pointer", color: "var(--grey-11)", padding: 4, display: "flex" }}>
+              <button onClick={() => setQ("")} title="Clear" style={{ background: "transparent", border: "none", cursor: "pointer", color: "var(--grey-11)", padding: 4, display: "flex" }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
                 </svg>
               </button>
             )}
-            <button onClick={runAsk} disabled={!q.trim() || askLoading}
-              style={{ fontSize: 12, fontWeight: 600, padding: "6px 12px", borderRadius: 5, border: "1px solid var(--brand-cyan)", background: q.trim() && !askLoading ? "var(--brand-cyan-deep)" : "var(--grey-2)", color: q.trim() && !askLoading ? "#fff" : "var(--grey-11)", cursor: q.trim() && !askLoading ? "pointer" : "default", fontFamily: "var(--font-sans)" }}>
-              {askLoading ? "…" : "Ask"}
-            </button>
           </div>
-
-          {(askLoading || askResult || askError) && (
-            <div style={{ marginBottom: 14, padding: "12px 14px", borderRadius: 8, background: "var(--brand-cyan-tint)", border: "1px solid var(--brand-cyan)", display: "flex", flexDirection: "column", gap: 6 }}>
-              <div style={{ display: "flex", alignItems: "baseline", gap: 8, fontSize: 10.5, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--brand-cyan-deep)", fontWeight: 700 }}>
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5l1.9 5.3L19 9.7l-5.1 1.9L12 17l-1.9-5.4L5 9.7l5.1-1.9L12 2.5z"/></svg>
-                Ask the Electives Catalog
-              </div>
-              <div style={{ fontSize: 12.5, color: "var(--grey-11)", fontStyle: "italic" }}>“{askQuery || q}”</div>
-              {askLoading && <div style={{ fontSize: 13, color: "var(--ink-2)" }}>Searching the catalog…</div>}
-              {askError && <div style={{ fontSize: 13, color: "var(--bad)" }}>{askError}</div>}
-              {askResult && askResult.summary && (
-                <div style={{ fontSize: 14, color: "var(--ink-1)", lineHeight: 1.45 }}>{askResult.summary}</div>
-              )}
-              {askResult && (
-                <button onClick={clearAsk}
-                  style={{ alignSelf: "flex-start", marginTop: 2, fontSize: 11.5, fontWeight: 600, padding: "3px 9px", borderRadius: 4, border: "1px solid var(--brand-cyan-deep)", background: "transparent", color: "var(--brand-cyan-deep)", cursor: "pointer", fontFamily: "var(--font-sans)" }}>
-                  Clear question — show full catalog
-                </button>
-              )}
-            </div>
-          )}
 
           {/* Active chips */}
           {activeFilters > 0 && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 14 }}>
+              {q && <Chip label={`"${q}"`} onRemove={() => setQ("")} />}
               {filterSpecialty !== "All" && <Chip label={filterSpecialty} onRemove={() => setFilterSpecialty("All")} />}
               {filterType !== "All" && <Chip label={filterType} onRemove={() => setFilterType("All")} />}
               {filterYear !== "All" && <Chip label={`Year ${filterYear}`} onRemove={() => setFilterYear("All")} />}
@@ -40424,15 +40367,13 @@ function VariantE() {
           {/* Results list */}
           {filtered.length === 0 ? (
             <div className="card" style={{ padding: "60px 20px", textAlign: "center", color: "var(--grey-11)", fontSize: 13 }}>
-              {askResult
-                ? "Ask ASCEND didn’t find a match. Try rephrasing, or "
-                : "No electives match your filters. Try removing some constraints, or "}
+              No electives match your filters. Try removing some constraints, or
               <a href="#" onClick={(e) => { e.preventDefault(); clearAll(); }} style={{ color: "var(--brand-cyan-deep)", marginLeft: 4, fontWeight: 600 }}>clear all</a>.
             </div>
           ) : (
             <div className="col" style={{ gap: 10 }}>
               {filtered.map(e => (
-                <ElectiveCard key={e.code} e={e} active={selected?.code === e.code} onOpen={() => setSelected(e)} reason={e.why} />
+                <ElectiveCard key={e.code} e={e} active={selected?.code === e.code} onOpen={() => setSelected(e)} />
               ))}
             </div>
           )}
