@@ -35667,7 +35667,7 @@ function buildSearchIndex() {
       idx.push({
         kind: "Session", id: s.id,
         title: s.title,
-        sub: `${modShort}${s.week ? " · Week " + s.week : ""}${s.type ? " · " + s.type : ""}`,
+        sub: `${modShort}${s.type ? " · " + s.type : ""}`,
         meta: `${s.duration ? s.duration + " min" : ""}${s.faculty ? " · " + s.faculty : ""}`,
         haystack: [
           s.title, modShort, modName, modId, s.type, s.faculty || "",
@@ -36499,7 +36499,7 @@ function SessionResultCard({ item, rank, onOpen }) {
         <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 4, flexWrap: "wrap" }}>
           <span className={`pill ${pill.kind}`} style={{ flex: "0 0 auto" }}>{pill.label}</span>
           <span style={{ fontSize: 11, color: "var(--grey-11)" }}>
-            {item.moduleShort}{s.week ? " · Week " + s.week : ""}
+            {item.moduleShort}
           </span>
           {s.duration ? (
             <span style={{ fontSize: 11, color: "var(--grey-11)" }}>· {s.duration} min</span>
@@ -36586,7 +36586,7 @@ function SessionDetailOverlay({ item, onClose, onOpenInTrace }) {
         </button>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 11, color: "var(--grey-11)", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 600 }}>
-            {item.moduleShort} — {item.moduleName}{s.week ? " · Week " + s.week : ""}
+            {item.moduleShort} — {item.moduleName}
           </div>
           <div style={{ fontSize: 20, fontWeight: 700, color: "var(--session-title-deep)", marginTop: 4, lineHeight: 1.25, fontFamily: "var(--font-serif, var(--font-sans))" }}>
             {s.title}
@@ -38079,7 +38079,6 @@ function OutcomeModuleViewB({ mepo, mod }) {
             {taughtIn.map(({ s, matchingObjs }, i) => (
               <div key={s.id} style={{ padding: "12px 0", borderTop: i === 0 ? "none" : "1px solid var(--grey-2)" }}>
                 <div className="row" style={{ gap: 10, alignItems: "center", marginBottom: 4 }}>
-                  <span style={{ width: 38, fontSize: 11, color: "var(--grey-11)", fontWeight: 600, letterSpacing: "0.04em" }}>WK {s.week}</span>
                   <span className="pill cyan" style={{ width: 78, justifyContent: "center" }}>{s.type}</span>
                   <span style={{ flex: 1, fontWeight: 600, fontSize: 13, color: "var(--session-title)" }}>{s.title}</span>
                   <button onClick={() => window.APP_NAV?.openTrace({ moduleId: mod.id, sessionId: s.id })}
@@ -38150,8 +38149,7 @@ function OutcomeModuleViewB({ mepo, mod }) {
                 {taughtIn.map(({ s, matchingObjs }, i) => (
                   <div key={s.id} style={{ padding: "12px 0", borderTop: i === 0 ? "none" : "1px solid var(--grey-2)" }}>
                     <div className="row" style={{ gap: 10, alignItems: "center", marginBottom: 4 }}>
-                      <span style={{ width: 38, fontSize: 11, color: "var(--grey-11)", fontWeight: 600, letterSpacing: "0.04em" }}>WK {s.week}</span>
-                      <span className="pill cyan" style={{ width: 78, justifyContent: "center" }}>{s.type}</span>
+                          <span className="pill cyan" style={{ width: 78, justifyContent: "center" }}>{s.type}</span>
                       <span style={{ flex: 1, fontWeight: 600, fontSize: 13, color: "var(--session-title)" }}>{s.title}</span>
                       <button onClick={() => window.APP_NAV?.openTrace({ moduleId: mod.id, sessionId: s.id })}
                         style={{ background: "none", border: "1px solid var(--grey-3)", borderRadius: 4, padding: "2px 8px", fontSize: 10.5, color: "var(--brand-cyan-deep)", cursor: "pointer", fontWeight: 600 }}>
@@ -39156,7 +39154,7 @@ function SessionSidePanel({ session, mod, onClose }) {
       </div>
       <div style={{ fontWeight: 600, fontSize: 14, lineHeight: 1.35, marginBottom: 4, color: "var(--session-title)" }}>{session.title}</div>
       <div style={{ fontSize: 11, color: "var(--grey-11)", marginBottom: 12 }}>
-        {mod?.name}{session.week ? " · Week " + session.week : ""} · {window.shortTypeCode(session.type, mod?.id, mod?.phase)}
+        {mod?.name} · {window.shortTypeCode(session.type, mod?.id, mod?.phase)}
         {session.duration ? " · " + session.duration + " min" : ""}
       </div>
       {/* SLOs */}
@@ -39329,7 +39327,6 @@ function AocsInline({ navigateToSession }) {
                 {sessions.map((s, i) => (
                   <button key={s.id} onClick={() => setPickedSession({ session: s, mod })}
                           style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "10px 16px", borderTop: i === 0 ? "none" : "1px solid var(--grey-2)", background: "transparent", border: "none", textAlign: "left", width: "100%", cursor: "pointer", fontFamily: "inherit" }}>
-                    <span style={{ width: 60, fontSize: 11, color: "var(--grey-11)", fontWeight: 600, letterSpacing: "0.04em", paddingTop: 2 }}>WK {s.week ?? "—"}</span>
                     <SessionTypePill type={s.type} modId={mod.id} modPhase={mod.phase}/>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.3, color: "var(--session-title)" }}>{s.title}</div>
@@ -39497,7 +39494,6 @@ function ThreadsInline({ navigateToSession }) {
                   return (
                   <button key={s.id} onClick={() => setPickedSession({ session: s, mod })}
                           style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "10px 16px", borderTop: i === 0 ? "none" : "1px solid var(--grey-2)", background: "transparent", border: "none", textAlign: "left", width: "100%", cursor: "pointer", fontFamily: "inherit" }}>
-                    <span style={{ width: 60, fontSize: 11, color: "var(--grey-11)", fontWeight: 600, letterSpacing: "0.04em", paddingTop: 2 }}>WK {s.week ?? "—"}</span>
                     <SessionTypePill type={s.type} modId={mod.id} modPhase={mod.phase}/>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.3, color: "var(--session-title)" }}>{s.title}</div>
@@ -39796,7 +39792,10 @@ function Caret({ open }) {
 }
 
 function SessionList({ pack, mod, openSession, setOpenSession, setHoveredObjIdx, typeFilter }) {
-  // Group sessions by week, applying the optional type filter
+  // Sessions are sorted alphabetically by title. Week designation is
+  // intentionally not used here — week numbers in source data don't reflect
+  // the live academic calendar, so grouping by week produced misleading
+  // "schedules". Alphabetical listing is calendar-agnostic.
   const filterActive = typeFilter && typeFilter.size > 0;
   const visibleSessions = filterActive
     ? pack.sessions.filter(s => typeFilter.has(s.type))
@@ -39810,42 +39809,31 @@ function SessionList({ pack, mod, openSession, setOpenSession, setHoveredObjIdx,
     );
   }
 
-  const byWeek = {};
-  visibleSessions.forEach(s => { (byWeek[s.week] = byWeek[s.week] || []).push(s); });
-  const weeks = Object.keys(byWeek).map(Number).sort((a, b) => a - b);
+  const sortedSessions = [...visibleSessions].sort((a, b) =>
+    (a.title || "").localeCompare(b.title || ""));
 
   return (
     <div style={{ borderTop: "1px solid var(--grey-2)", background: "var(--paper)" }}>
-      {weeks.map(w => {
-        const wkSessions = byWeek[w];
+      {sortedSessions.map((s, idx) => {
+        const isOpen = openSession === s.id;
+        const sessNum = s.n || idx + 1;
         return (
-          <div key={w}>
-            <div style={{ padding: "8px 16px 6px 36px", fontSize: 10.5, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--grey-7)", fontWeight: 600, background: "var(--grey-1)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span>Week {w}</span>
+          <div key={s.id} style={{ borderBottom: "1px solid var(--grey-2)" }}>
+            <div
+              style={{ padding: "10px 16px 10px 36px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer", background: isOpen ? "var(--brand-cyan-tint)" : "transparent" }}
+              onClick={(e) => { e.stopPropagation(); setOpenSession(isOpen ? null : s.id); setHoveredObjIdx(null); }}>
+              <Caret open={isOpen} />
+              <div style={{ width: 36, fontSize: 11, color: "var(--grey-11)", flex: "0 0 36px", fontVariantNumeric: "tabular-nums" }}>
+                #{sessNum}
+              </div>
+              <SessionTypePill type={s.type} modId={mod.id} modPhase={mod.phase} />
+              <div style={{ flex: 1, fontWeight: 600, fontSize: 13, color: "var(--session-title)" }}>{s.title}</div>
+              <div style={{ fontSize: 11, color: "var(--grey-11)" }}>{s.duration}min</div>
+              <div style={{ fontSize: 11, color: "var(--grey-11)", marginLeft: 8 }}>
+                <span className="t-num">{s.objectives.length}</span> obj · <span className="t-num">{new Set(s.objectives.flatMap(o => o.mlos)).size}</span> MLOs
+              </div>
             </div>
-            {wkSessions.map((s, idx) => {
-              const isOpen = openSession === s.id;
-              const sessNum = s.n || idx + 1;
-              return (
-                <div key={s.id} style={{ borderBottom: "1px solid var(--grey-2)" }}>
-                  <div
-                    style={{ padding: "10px 16px 10px 36px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer", background: isOpen ? "var(--brand-cyan-tint)" : "transparent" }}
-                    onClick={(e) => { e.stopPropagation(); setOpenSession(isOpen ? null : s.id); setHoveredObjIdx(null); }}>
-                    <Caret open={isOpen} />
-                    <div style={{ width: 36, fontSize: 11, color: "var(--grey-11)", flex: "0 0 36px", fontVariantNumeric: "tabular-nums" }}>
-                      #{sessNum}
-                    </div>
-                    <SessionTypePill type={s.type} modId={mod.id} modPhase={mod.phase} />
-                    <div style={{ flex: 1, fontWeight: 600, fontSize: 13, color: "var(--session-title)" }}>{s.title}</div>
-                    <div style={{ fontSize: 11, color: "var(--grey-11)" }}>{s.duration}min</div>
-                    <div style={{ fontSize: 11, color: "var(--grey-11)", marginLeft: 8 }}>
-                      <span className="t-num">{s.objectives.length}</span> obj · <span className="t-num">{new Set(s.objectives.flatMap(o => o.mlos)).size}</span> MLOs
-                    </div>
-                  </div>
-                  {isOpen && <SessionObjectives session={s} pack={pack} mod={mod} setHoveredObjIdx={setHoveredObjIdx} />}
-                </div>
-              );
-            })}
+            {isOpen && <SessionObjectives session={s} pack={pack} mod={mod} setHoveredObjIdx={setHoveredObjIdx} />}
           </div>
         );
       })}
@@ -41657,7 +41645,7 @@ function AocThreadDetail({ picked, onBack, onOpenSession }) {
               const item = {
                 kind: "Session", id: r.session.id,
                 title: r.session.title,
-                sub: `${r.mod.short || r.mod.id}${r.session.week ? " · Week " + r.session.week : ""}${r.session.type ? " · " + r.session.type : ""}`,
+                sub: `${r.mod.short || r.mod.id}${r.session.type ? " · " + r.session.type : ""}`,
                 meta: r.session.duration ? r.session.duration + " min" : "",
                 session: r.session, moduleId: r.mod.id, moduleShort: r.mod.short || r.mod.id, slos,
               };
@@ -41665,7 +41653,7 @@ function AocThreadDetail({ picked, onBack, onOpenSession }) {
               <button key={r.mod.id + ":" + (r.session.n || i)} onClick={() => onOpenSession && onOpenSession(item)}
                 style={{ display: "flex", flexDirection: "column", gap: 3, padding: "11px 14px", border: "none", background: "transparent", borderTop: i === 0 ? "none" : "1px solid " + BRAND.grey2, textAlign: "left", cursor: "pointer", width: "100%", fontFamily: "inherit", WebkitTapHighlightColor: "rgba(0,0,0,0.06)" }}>
                 <div style={{ fontSize: 10.5, color: BRAND.grey11, fontWeight: 600, letterSpacing: 0.4, textTransform: "uppercase" }}>
-                  {r.mod.short || r.mod.name}{r.session.week ? " · Wk " + r.session.week : ""}
+                  {r.mod.short || r.mod.name}
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <div style={{ flex: 1, fontSize: 13.5, fontWeight: 600, color: BRAND.sessionTitle || "#0B3B7A", lineHeight: 1.3 }}>{r.session.title}</div>
@@ -42586,7 +42574,7 @@ function buildCurriculumIndex() {
         : (s.slos || []).filter(Boolean);
       idx.push({
         kind: "Session", id: s.id,
-        title: s.title, sub: modShort + (s.week ? " · Week " + s.week : "") + (s.type ? " · " + s.type : ""),
+        title: s.title, sub: modShort + (s.type ? " · " + s.type : ""),
         meta: [s.duration ? s.duration + " min" : null, s.faculty].filter(Boolean).join(" · "),
         haystack: [s.title, modShort, modId, s.type, s.faculty, s.methods, ...slos, s.keywords, s.clinical, s.societal].filter(Boolean).join(" ").toLowerCase(),
         payload: { session: s, moduleId: modId, moduleShort: modShort, slos },
@@ -42791,7 +42779,7 @@ function CurriculumSearch({ onOpenResult, onOpenPlaceholder, q, setQ, navPath, s
             out.push({
               id: "sess:" + s.id,
               label: s.title,
-              sub: (m.short || m.id) + (s.week ? " · Week " + s.week : "") + (s.type ? " · " + s.type : ""),
+              sub: (m.short || m.id) + (s.type ? " · " + s.type : ""),
               meta: [s.duration ? s.duration + " min" : null, s.aoc && filter.aoc ? "AOC: " + s.aoc + (s.aocSubdomain ? " · " + s.aocSubdomain : "") : null].filter(Boolean).join(" · "),
               sessionPayload: { session: s, module: m },
             });
@@ -42826,7 +42814,7 @@ function CurriculumSearch({ onOpenResult, onOpenPlaceholder, q, setQ, navPath, s
       onOpenResult({
         kind: "Session", id: sp.session.id,
         title: sp.session.title,
-        sub: moduleShort + (sp.session.week ? " · Week " + sp.session.week : "") + (sp.session.type ? " · " + sp.session.type : ""),
+        sub: moduleShort + (sp.session.type ? " · " + sp.session.type : ""),
         meta: [sp.session.duration ? sp.session.duration + " min" : null, sp.session.faculty].filter(Boolean).join(" · "),
         payload: { session: sp.session, moduleId: sp.module.id, moduleShort, slos },
       });
@@ -43215,7 +43203,7 @@ function SessionDetailBody({ item, onOpenItem }) {
     onOpenItem({
       kind: "Session", id: rs.id,
       title: rs.title,
-      sub: (rmod.short || rmod.id) + (rs.week ? " · Week " + rs.week : "") + (rs.type ? " · " + rs.type : ""),
+      sub: (rmod.short || rmod.id) + (rs.type ? " · " + rs.type : ""),
       meta: [rs.duration ? rs.duration + " min" : null, rs.faculty].filter(Boolean).join(" · "),
       payload: { session: rs, moduleId: rmod.id, moduleShort: rmod.short || rmod.id, slos: rSlos },
     });
@@ -43421,7 +43409,7 @@ function ModuleDetailBody({ item, onOpenItem }) {
     onOpenItem({
       kind: "Session", id: s.id,
       title: s.title,
-      sub: moduleShort + (s.week ? " · Week " + s.week : "") + (s.type ? " · " + s.type : ""),
+      sub: moduleShort + (s.type ? " · " + s.type : ""),
       meta: [s.duration ? s.duration + " min" : null, s.faculty].filter(Boolean).join(" · "),
       payload: { session: s, moduleId: m.id, moduleShort, slos },
     });
@@ -43455,12 +43443,9 @@ function ModuleDetailBody({ item, onOpenItem }) {
       {sessions.length > 0 ? (
         <InfoBlock label={"Sessions · " + sessions.length}>
           <div style={{ display: "flex", flexDirection: "column", paddingTop: 4 }}>
-            {sessions.map((s, i) => (
+            {[...sessions].sort((a, b) => (a.title || "").localeCompare(b.title || "")).map((s, i) => (
               <button key={s.id || i} onClick={() => openSession(s)}
                 style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "11px 0", border: "none", background: "transparent", borderTop: i === 0 ? "none" : "1px solid " + BRAND.grey2, textAlign: "left", cursor: "pointer", width: "100%", fontFamily: "inherit", WebkitTapHighlightColor: "rgba(0,0,0,0.06)" }}>
-                <div style={{ flex: "0 0 52px", paddingTop: 2 }}>
-                  <div style={{ fontSize: 10, color: BRAND.grey11, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 700 }}>{s.week != null ? "Week " + s.week : "—"}</div>
-                </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13.5, fontWeight: 600, color: BRAND.sessionTitle || "#0B3B7A", lineHeight: 1.35 }}>{s.title}</div>
                   <div style={{ fontSize: 11.5, color: BRAND.grey11, marginTop: 3, fontWeight: 500 }}>
@@ -43561,7 +43546,7 @@ function MepoDetailBody({ item, onOpenItem }) {
               const sItem = {
                 kind: "Session", id: r.session.id,
                 title: r.session.title,
-                sub: `${r.mod.short || r.mod.id}${r.session.week ? " · Week " + r.session.week : ""}${r.session.type ? " · " + r.session.type : ""}`,
+                sub: `${r.mod.short || r.mod.id}${r.session.type ? " · " + r.session.type : ""}`,
                 meta: r.session.duration ? r.session.duration + " min" : "",
                 session: r.session, moduleId: r.mod.id, moduleShort: r.mod.short || r.mod.id, slos,
               };
@@ -43569,7 +43554,7 @@ function MepoDetailBody({ item, onOpenItem }) {
               <button key={r.mod.id + ":" + (r.session.n || i)} onClick={() => onOpenItem && onOpenItem(sItem)}
                 style={{ display: "flex", flexDirection: "column", gap: 3, padding: "10px 8px", border: "none", background: "transparent", borderTop: i === 0 ? "1px solid " + BRAND.grey2 : "1px solid " + BRAND.grey2, textAlign: "left", cursor: "pointer", width: "100%", fontFamily: "inherit", WebkitTapHighlightColor: "rgba(0,0,0,0.06)" }}>
                 <div style={{ fontSize: 10.5, color: BRAND.grey11, fontWeight: 600, letterSpacing: 0.4, textTransform: "uppercase" }}>
-                  {r.mod.short || r.mod.name}{r.session.week ? " · Wk " + r.session.week : ""}
+                  {r.mod.short || r.mod.name}
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <div style={{ flex: 1, fontSize: 13.5, fontWeight: 600, color: BRAND.sessionTitle || "#0B3B7A", lineHeight: 1.3 }}>{r.session.title}</div>
