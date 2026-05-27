@@ -39809,34 +39809,48 @@ function SessionList({ pack, mod, openSession, setOpenSession, setHoveredObjIdx,
     );
   }
 
-  const sortedSessions = [...visibleSessions].sort((a, b) =>
-    (a.title || "").localeCompare(b.title || ""));
+  // Group by session type (alpha), then by title within each group.
+  // The #N column is intentionally not shown — numbering implies a sequence
+  // and source numbering doesn't reflect the live schedule.
+  const byType = {};
+  for (const s of visibleSessions) {
+    const t = s.type || "Other";
+    (byType[t] = byType[t] || []).push(s);
+  }
+  const typeNames = Object.keys(byType).sort((a, b) => a.localeCompare(b));
+  for (const t of typeNames) {
+    byType[t].sort((a, b) => (a.title || "").localeCompare(b.title || ""));
+  }
 
   return (
     <div style={{ borderTop: "1px solid var(--grey-2)", background: "var(--paper)" }}>
-      {sortedSessions.map((s, idx) => {
-        const isOpen = openSession === s.id;
-        const sessNum = s.n || idx + 1;
-        return (
-          <div key={s.id} style={{ borderBottom: "1px solid var(--grey-2)" }}>
-            <div
-              style={{ padding: "10px 16px 10px 36px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer", background: isOpen ? "var(--brand-cyan-tint)" : "transparent" }}
-              onClick={(e) => { e.stopPropagation(); setOpenSession(isOpen ? null : s.id); setHoveredObjIdx(null); }}>
-              <Caret open={isOpen} />
-              <div style={{ width: 36, fontSize: 11, color: "var(--grey-11)", flex: "0 0 36px", fontVariantNumeric: "tabular-nums" }}>
-                #{sessNum}
-              </div>
-              <SessionTypePill type={s.type} modId={mod.id} modPhase={mod.phase} />
-              <div style={{ flex: 1, fontWeight: 600, fontSize: 13, color: "var(--session-title)" }}>{s.title}</div>
-              <div style={{ fontSize: 11, color: "var(--grey-11)" }}>{s.duration}min</div>
-              <div style={{ fontSize: 11, color: "var(--grey-11)", marginLeft: 8 }}>
-                <span className="t-num">{s.objectives.length}</span> obj · <span className="t-num">{new Set(s.objectives.flatMap(o => o.mlos)).size}</span> MLOs
-              </div>
-            </div>
-            {isOpen && <SessionObjectives session={s} pack={pack} mod={mod} setHoveredObjIdx={setHoveredObjIdx} />}
+      {typeNames.map(t => (
+        <div key={t}>
+          <div style={{ padding: "8px 16px 6px 36px", fontSize: 10.5, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--grey-7)", fontWeight: 600, background: "var(--grey-1)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span>{t}</span>
+            <span style={{ fontVariantNumeric: "tabular-nums", color: "var(--grey-11)" }}>{byType[t].length}</span>
           </div>
-        );
-      })}
+          {byType[t].map(s => {
+            const isOpen = openSession === s.id;
+            return (
+              <div key={s.id} style={{ borderBottom: "1px solid var(--grey-2)" }}>
+                <div
+                  style={{ padding: "10px 16px 10px 36px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer", background: isOpen ? "var(--brand-cyan-tint)" : "transparent" }}
+                  onClick={(e) => { e.stopPropagation(); setOpenSession(isOpen ? null : s.id); setHoveredObjIdx(null); }}>
+                  <Caret open={isOpen} />
+                  <SessionTypePill type={s.type} modId={mod.id} modPhase={mod.phase} />
+                  <div style={{ flex: 1, fontWeight: 600, fontSize: 13, color: "var(--session-title)" }}>{s.title}</div>
+                  <div style={{ fontSize: 11, color: "var(--grey-11)" }}>{s.duration}min</div>
+                  <div style={{ fontSize: 11, color: "var(--grey-11)", marginLeft: 8 }}>
+                    <span className="t-num">{s.objectives.length}</span> obj · <span className="t-num">{new Set(s.objectives.flatMap(o => o.mlos)).size}</span> MLOs
+                  </div>
+                </div>
+                {isOpen && <SessionObjectives session={s} pack={pack} mod={mod} setHoveredObjIdx={setHoveredObjIdx} />}
+              </div>
+            );
+          })}
+        </div>
+      ))}
     </div>
   );
 }
@@ -43442,20 +43456,42 @@ function ModuleDetailBody({ item, onOpenItem }) {
       )}
       {sessions.length > 0 ? (
         <InfoBlock label={"Sessions · " + sessions.length}>
-          <div style={{ display: "flex", flexDirection: "column", paddingTop: 4 }}>
-            {[...sessions].sort((a, b) => (a.title || "").localeCompare(b.title || "")).map((s, i) => (
-              <button key={s.id || i} onClick={() => openSession(s)}
-                style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "11px 0", border: "none", background: "transparent", borderTop: i === 0 ? "none" : "1px solid " + BRAND.grey2, textAlign: "left", cursor: "pointer", width: "100%", fontFamily: "inherit", WebkitTapHighlightColor: "rgba(0,0,0,0.06)" }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13.5, fontWeight: 600, color: BRAND.sessionTitle || "#0B3B7A", lineHeight: 1.35 }}>{s.title}</div>
-                  <div style={{ fontSize: 11.5, color: BRAND.grey11, marginTop: 3, fontWeight: 500 }}>
-                    {[moduleTypeCode(s), s.duration ? s.duration + " min" : null].filter((x) => x && x !== "Other").join(" · ") || "—"}
+          {(() => {
+            // Group by session type (alpha), then by title within each group.
+            const byType = {};
+            for (const s of sessions) {
+              const t = s.type || "Other";
+              (byType[t] = byType[t] || []).push(s);
+            }
+            const typeNames = Object.keys(byType).sort((a, b) => a.localeCompare(b));
+            for (const t of typeNames) {
+              byType[t].sort((a, b) => (a.title || "").localeCompare(b.title || ""));
+            }
+            return (
+              <div style={{ display: "flex", flexDirection: "column", paddingTop: 4 }}>
+                {typeNames.map((t) => (
+                  <div key={t}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0 6px", fontSize: 10.5, color: BRAND.grey11, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", borderTop: "1px solid " + BRAND.grey2, marginTop: 6 }}>
+                      <span>{t}</span>
+                      <span style={{ fontVariantNumeric: "tabular-nums", fontWeight: 600 }}>{byType[t].length}</span>
+                    </div>
+                    {byType[t].map((s, i) => (
+                      <button key={s.id || i} onClick={() => openSession(s)}
+                        style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "11px 0", border: "none", background: "transparent", borderTop: i === 0 ? "none" : "1px solid " + BRAND.grey2, textAlign: "left", cursor: "pointer", width: "100%", fontFamily: "inherit", WebkitTapHighlightColor: "rgba(0,0,0,0.06)" }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13.5, fontWeight: 600, color: BRAND.sessionTitle || "#0B3B7A", lineHeight: 1.35 }}>{s.title}</div>
+                          <div style={{ fontSize: 11.5, color: BRAND.grey11, marginTop: 3, fontWeight: 500 }}>
+                            {s.duration ? s.duration + " min" : "—"}
+                          </div>
+                        </div>
+                        <IconChevR size={14} stroke={BRAND.grey3} sw={2} style={{ marginTop: 4, flexShrink: 0 }}/>
+                      </button>
+                    ))}
                   </div>
-                </div>
-                <IconChevR size={14} stroke={BRAND.grey3} sw={2} style={{ marginTop: 4, flexShrink: 0 }}/>
-              </button>
-            ))}
-          </div>
+                ))}
+              </div>
+            );
+          })()}
         </InfoBlock>
       ) : (
         <div style={{ background: "#fff", borderRadius: 12, padding: "16px 16px", marginBottom: 10, fontSize: 13, color: BRAND.grey11, lineHeight: 1.5 }}>
