@@ -1,0 +1,22 @@
+Sort module sessions alphabetically; remove week designation from list views
+
+Sessions inside each module were grouped under "Week 1 / Week 2 / ..."
+headers using a `week` field from source data that does not reflect the
+live academic calendar. The misalignment produced misleading "schedules"
+every time the real calendar shifted.
+
+Changes:
+- Desktop SessionList: replace weekly grouping with a single
+  alphabetical list sorted by session title.
+- Mobile ModuleDetailBody session list: same alphabetical sort; remove
+  the left-rail "Week N" column.
+- Strip "Week N" / "Wk N" from every session subtitle, breadcrumb, and
+  list eyebrow across search results, AOC/Thread lists, MEPO
+  drill-downs, related sessions, and the session side panel.
+
+Deliberately preserved (data fields and user-driven filters, not list
+display, so they remain useful):
+- StatTile "Week" on the session detail card
+- DetailRow "Week" inside the session detail body
+- "Week" facet dropdown in global search
+- "Week" column in the alignment-audit CSV export

@@ -1,0 +1,153 @@
+From: ASCEND Curriculum Maintainer
+Subject: [PATCH] Sort module sessions alphabetically; remove week designation from list views
+
+Sessions inside each module were grouped under "Week 1 / Week 2 / ..." headers
+using a `week` field from source data that does not reflect the live academic
+calendar. This produced misleading schedules every time the real calendar
+shifted.
+
+This patch:
+  1. Sorts sessions alphabetically by title in both the desktop and mobile
+     module session lists.
+  2. Removes the "Week N" group headers and the mobile left-rail week column.
+  3. Strips "Week N" / "Wk N" from every session subtitle / breadcrumb / list
+     eyebrow so nothing in a list view implies a schedule.
+
+Deliberately preserved:
+  - The "Week" StatTile on the session detail card (a data field, not a list).
+  - The "Week" facet in global search filters (user-driven filter, not display).
+  - The "Week" column in the alignment-audit CSV export.
+  - The "Week" DetailRow inside the session detail body.
+---
+ index.html | 70 +++++++++++++++++++++---------------------------------
+ 1 file changed, 28 insertions(+), 42 deletions(-)
+
+--- a/index.html
++++ b/index.html
+@@
+ function SessionList({ pack, mod, openSession, setOpenSession, setHoveredObjIdx, typeFilter }) {
+-  // Group sessions by week, applying the optional type filter
++  // Sessions are sorted alphabetically by title. Week designation is
++  // intentionally not used here — week numbers in source data don't
++  // reflect the live academic calendar, so grouping by week produced
++  // misleading "schedules". Alphabetical listing is calendar-agnostic.
+   const filterActive = typeFilter && typeFilter.size > 0;
+   const visibleSessions = filterActive
+     ? pack.sessions.filter(s => typeFilter.has(s.type))
+     : pack.sessions;
+ 
+   if (filterActive && visibleSessions.length === 0) {
+     return (
+       <div style={{ padding: "14px 18px", fontSize: 12.5, color: "var(--grey-11)", fontStyle: "italic", borderTop: "1px solid var(--grey-2)", background: "var(--paper)" }}>
+         No sessions in this module match the active type filter.
+       </div>
+     );
+   }
+ 
+-  const byWeek = {};
+-  visibleSessions.forEach(s => { (byWeek[s.week] = byWeek[s.week] || []).push(s); });
+-  const weeks = Object.keys(byWeek).map(Number).sort((a, b) => a - b);
++  const sortedSessions = [...visibleSessions].sort((a, b) =>
++    (a.title || "").localeCompare(b.title || ""));
+ 
+   return (
+     <div style={{ borderTop: "1px solid var(--grey-2)", background: "var(--paper)" }}>
+-      {weeks.map(w => {
+-        const wkSessions = byWeek[w];
+-        return (
+-          <div key={w}>
+-            <div style={{ padding: "8px 16px 6px 36px", fontSize: 10.5, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--grey-7)", fontWeight: 600, background: "var(--grey-1)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+-              <span>Week {w}</span>
++      {sortedSessions.map((s, idx) => {
++        const isOpen = openSession === s.id;
++        const sessNum = s.n || idx + 1;
++        return (
++          <div key={s.id} style={{ borderBottom: "1px solid var(--grey-2)" }}>
++            <div
++              style={{ padding: "10px 16px 10px 36px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer", background: isOpen ? "var(--brand-cyan-tint)" : "transparent" }}
++              onClick={(e) => { e.stopPropagation(); setOpenSession(isOpen ? null : s.id); setHoveredObjIdx(null); }}>
++              <Caret open={isOpen} />
++              <div style={{ width: 36, fontSize: 11, color: "var(--grey-11)", flex: "0 0 36px", fontVariantNumeric: "tabular-nums" }}>
++                #{sessNum}
++              </div>
++              <SessionTypePill type={s.type} modId={mod.id} modPhase={mod.phase} />
++              <div style={{ flex: 1, fontWeight: 600, fontSize: 13, color: "var(--session-title)" }}>{s.title}</div>
++              <div style={{ fontSize: 11, color: "var(--grey-11)" }}>{s.duration}min</div>
++              <div style={{ fontSize: 11, color: "var(--grey-11)", marginLeft: 8 }}>
++                <span className="t-num">{s.objectives.length}</span> obj · <span className="t-num">{new Set(s.objectives.flatMap(o => o.mlos)).size}</span> MLOs
++              </div>
+             </div>
+-            {wkSessions.map((s, idx) => {
+-              const isOpen = openSession === s.id;
+-              const sessNum = s.n || idx + 1;
+-              return (
+-                <div key={s.id} style={{ borderBottom: "1px solid var(--grey-2)" }}>
+-                  <div
+-                    style={{ padding: "10px 16px 10px 36px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer", background: isOpen ? "var(--brand-cyan-tint)" : "transparent" }}
+-                    onClick={(e) => { e.stopPropagation(); setOpenSession(isOpen ? null : s.id); setHoveredObjIdx(null); }}>
+-                    <Caret open={isOpen} />
+-                    <div style={{ width: 36, fontSize: 11, color: "var(--grey-11)", flex: "0 0 36px", fontVariantNumeric: "tabular-nums" }}>
+-                      #{sessNum}
+-                    </div>
+-                    <SessionTypePill type={s.type} modId={mod.id} modPhase={mod.phase} />
+-                    <div style={{ flex: 1, fontWeight: 600, fontSize: 13, color: "var(--session-title)" }}>{s.title}</div>
+-                    <div style={{ fontSize: 11, color: "var(--grey-11)" }}>{s.duration}min</div>
+-                    <div style={{ fontSize: 11, color: "var(--grey-11)", marginLeft: 8 }}>
+-                      <span className="t-num">{s.objectives.length}</span> obj · <span className="t-num">{new Set(s.objectives.flatMap(o => o.mlos)).size}</span> MLOs
+-                    </div>
+-                  </div>
+-                  {isOpen && <SessionObjectives session={s} pack={pack} mod={mod} setHoveredObjIdx={setHoveredObjIdx} />}
+-                </div>
+-              );
+-            })}
++            {isOpen && <SessionObjectives session={s} pack={pack} mod={mod} setHoveredObjIdx={setHoveredObjIdx} />}
+           </div>
+         );
+       })}
+     </div>
+   );
+ }
+@@
+       {sessions.length > 0 ? (
+         <InfoBlock label={"Sessions · " + sessions.length}>
+           <div style={{ display: "flex", flexDirection: "column", paddingTop: 4 }}>
+-            {sessions.map((s, i) => (
++            {[...sessions].sort((a, b) => (a.title || "").localeCompare(b.title || "")).map((s, i) => (
+               <button key={s.id || i} onClick={() => openSession(s)}
+                 style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "11px 0", border: "none", background: "transparent", borderTop: i === 0 ? "none" : "1px solid " + BRAND.grey2, textAlign: "left", cursor: "pointer", width: "100%", fontFamily: "inherit", WebkitTapHighlightColor: "rgba(0,0,0,0.06)" }}>
+-                <div style={{ flex: "0 0 52px", paddingTop: 2 }}>
+-                  <div style={{ fontSize: 10, color: BRAND.grey11, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 700 }}>{s.week != null ? "Week " + s.week : "—"}</div>
+-                </div>
+                 <div style={{ flex: 1, minWidth: 0 }}>
+                   <div style={{ fontSize: 13.5, fontWeight: 600, color: BRAND.sessionTitle || "#0B3B7A", lineHeight: 1.35 }}>{s.title}</div>
+                   <div style={{ fontSize: 11.5, color: BRAND.grey11, marginTop: 3, fontWeight: 500 }}>
+                     {[moduleTypeCode(s), s.duration ? s.duration + " min" : null].filter((x) => x && x !== "Other").join(" · ") || "—"}
+                   </div>
+                 </div>
+                 <IconChevR size={14} stroke={BRAND.grey3} sw={2} style={{ marginTop: 4, flexShrink: 0 }}/>
+               </button>
+             ))}
+           </div>
+         </InfoBlock>
+       ) : (
+@@
+-        sub: `${modShort}${s.week ? " · Week " + s.week : ""}${s.type ? " · " + s.type : ""}`,
++        sub: `${modShort}${s.type ? " · " + s.type : ""}`,
+@@
+-      sub: moduleShort + (s.week ? " · Week " + s.week : "") + (s.type ? " · " + s.type : ""),
++      sub: moduleShort + (s.type ? " · " + s.type : ""),
+@@
+-      sub: (rmod.short || rmod.id) + (rs.week ? " · Week " + rs.week : "") + (rs.type ? " · " + rs.type : ""),
++      sub: (rmod.short || rmod.id) + (rs.type ? " · " + rs.type : ""),
+@@
+-        sub: moduleShort + (sp.session.week ? " · Week " + sp.session.week : "") + (sp.session.type ? " · " + sp.session.type : ""),
++        sub: moduleShort + (sp.session.type ? " · " + sp.session.type : ""),
+@@
+-                sub: `${r.mod.short || r.mod.id}${r.session.week ? " · Week " + r.session.week : ""}${r.session.type ? " · " + r.session.type : ""}`,
++                sub: `${r.mod.short || r.mod.id}${r.session.type ? " · " + r.session.type : ""}`,
+@@
+-                  {r.mod.short || r.mod.name}{r.session.week ? " · Wk " + r.session.week : ""}
++                  {r.mod.short || r.mod.name}
+@@
+-        {mod?.name}{session.week ? " · Week " + session.week : ""} · {window.shortTypeCode(session.type, mod?.id, mod?.phase)}
++        {mod?.name} · {window.shortTypeCode(session.type, mod?.id, mod?.phase)}
