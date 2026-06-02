@@ -41953,8 +41953,8 @@ function OutcomeModuleViewB({ mepo, mod }) {
         <>
           <div className="card">
             <div className="card-header">
-              <div className="card-title">Linked Module Learning Objectives ({linkedMlos.length} of {A.mlos.length})</div>
-              <div className="card-meta">These are the MLOs in {mod.short} that contribute evidence to MEPO {mepo.n}.</div>
+              <div className="card-title">Linked {window.objTerm(mod?.phase).full} ({linkedMlos.length} of {A.mlos.length})</div>
+              <div className="card-meta">These are the {window.objTerm(mod?.phase).short}s in {mod.short} that contribute evidence to MEPO {mepo.n}.</div>
             </div>
             <div className="col" style={{ gap: 10, marginTop: 4 }}>
               {linkedMlos.map(m => (
@@ -41996,7 +41996,7 @@ function OutcomeModuleViewB({ mepo, mod }) {
                         <li key={j} style={{ marginTop: 3 }}>
                           <span>{o.text}</span>
                           <span className="row" style={{ display: "inline-flex", gap: 3, marginLeft: 6, verticalAlign: "middle" }}>
-                            {o.mlos.filter(n => linkedMloNums.has(n)).map(n => <span key={n} className="pill cyan">MLO {n}</span>)}
+                            {o.mlos.filter(n => linkedMloNums.has(n)).map(n => <span key={n} className="pill cyan">{window.objTerm(mod?.phase).short} {n}</span>)}
                           </span>
                         </li>
                       ))}
@@ -42384,6 +42384,16 @@ function shortTypeCode(type, modId, modPhase) {
 }
 window.shortTypeCode = shortTypeCode;
 
+// Phase-aware objective terminology: Phase 2/3 clerkships use "Clerkship
+// Learning Objectives (CLO)"; Phase 1 modules use "Module Learning Objectives (MLO)".
+function objTerm(phase){
+  var p = String(phase == null ? "" : phase);
+  var clerk = /clerkship/i.test(p) || /phase\s*[23]\b/i.test(p) || /^\s*[23]\s*$/.test(p);
+  return clerk ? { full: "Clerkship Learning Objectives", short: "CLO" }
+               : { full: "Module Learning Objectives",     short: "MLO" };
+}
+window.objTerm = objTerm;
+
 // ──── variant-d.jsx ────
 ;(function(){
 // Variant D — Alignment Trace
@@ -42723,7 +42733,7 @@ function VariantD() {
                     "Week": s.week || "",
                     "Methods": s.methods || "",
                     "SLOs": sloCount,
-                    "MLOs targeted": [...mloNums].sort((a,b)=>a-b).map(n => "MLO " + n).join("; "),
+                    [window.objTerm(mod.phase).short + "s targeted"]: [...mloNums].sort((a,b)=>a-b).map(n => window.objTerm(mod.phase).short + " " + n).join("; "),
                     "MEPOs aligned": (lookup.mepos || []).map(n => "MEPO " + n).join("; "),
                   });
                 }
@@ -42752,7 +42762,7 @@ function VariantD() {
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 600, fontSize: 14 }}>{m.name}</div>
                     <div style={{ fontSize: 11, color: "var(--grey-11)", marginTop: 2 }}>
-                      {m.year} · {pack ? pack.sessions.length + " sessions" : "session list pending"} · {m.mloCount} MLOs
+                      {m.year} · {pack ? pack.sessions.length + " sessions" : "session list pending"} · {m.mloCount} {window.objTerm(m.phase).short}s
                       
                     </div>
                   </div>
@@ -42993,20 +43003,20 @@ function SessionSidePanel({ session, mod, onClose }) {
       {/* MLOs */}
       <div style={{ marginTop: 16 }}>
         <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
-          <div style={{ fontWeight: 600, fontSize: 12 }}>Module Learning Objectives</div>
+          <div style={{ fontWeight: 600, fontSize: 12 }}>{window.objTerm(mod?.phase).full}</div>
           <div style={{ fontSize: 11, color: "var(--grey-11)" }}>{alignment.mlos.length}</div>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {alignment.mlos.map(m => (
             <div key={m.code} style={{ borderLeft: "2px solid var(--brand-cyan)", paddingLeft: 10 }}>
-              <div style={{ fontWeight: 600, fontSize: 11.5 }}>{m.code}</div>
+              <div style={{ fontWeight: 600, fontSize: 11.5 }}>{window.objTerm(mod?.phase).short === "CLO" ? String(m.code).replace(/^MLO\b/, "CLO") : m.code}</div>
               <div style={{ fontSize: 11, color: "var(--ink-2)", marginTop: 2, lineHeight: 1.4 }}>{m.text}</div>
               <div className="row" style={{ gap: 4, marginTop: 4, flexWrap: "wrap" }}>
                 {(m.mepo || m.mepos || []).map(c => <span key={c} className="pill violet" style={{ fontSize: 10 }}>{c.replace(/\s+/g, "")}</span>)}
               </div>
             </div>
           ))}
-          {!alignment.mlos.length && <div className="muted" style={{ fontSize: 11 }}>No MLOs aligned.</div>}
+          {!alignment.mlos.length && <div className="muted" style={{ fontSize: 11 }}>No {window.objTerm(mod?.phase).short}s aligned.</div>}
         </div>
       </div>
       {/* MEPOs */}
@@ -43518,7 +43528,7 @@ function PlaceholderDetailInline({ item, leaf, path, onBack }) {
       )}
       <div className="card" style={{ padding: "14px 18px", fontSize: 12.5, color: "var(--grey-11)", lineHeight: 1.55 }}>
         <span style={{ color: "var(--ink-2)", fontWeight: 600 }}>Awaiting curriculum map.</span>{" "}
-        Sessions, MLOs, and MEPO alignment for {item.label} will appear here once ingested.
+        Sessions, {window.objTerm(meta.phase).short}s, and MEPO alignment for {item.label} will appear here once ingested.
       </div>
     </>
   );
@@ -43771,7 +43781,7 @@ function SessionObjectives({ session, pack, mod, setHoveredObjIdx }) {
                 style={{ fontSize: 13, lineHeight: 1.5, color: "var(--ink-2)", paddingLeft: 6, cursor: "pointer" }}>
               <span>{o.text}</span>
               <span className="row" style={{ display: "inline-flex", gap: 4, marginLeft: 8, verticalAlign: "middle" }}>
-                {(o.mlos || []).map(n => <span key={n} className="pill cyan">MLO {n}</span>)}
+                {(o.mlos || []).map(n => <span key={n} className="pill cyan">{window.objTerm(mod?.phase).short} {n}</span>)}
               </span>
             </li>
           ))}
@@ -43838,7 +43848,7 @@ function AlignmentPanel({ session, alignment, hoveredObjIdx, mod }) {
       <div className="t-eyebrow" style={{ marginBottom: 6 }}>Alignment trace</div>
       {!session ? (
         <div style={{ fontSize: 12.5, color: "var(--grey-11)", marginTop: 12, lineHeight: 1.5 }}>
-          Open a session to see its objectives mapped up to Module Learning Objectives and Program Objectives (MEPOs).
+          Open a session to see its objectives mapped up to {window.objTerm(mod?.phase).full} and Program Objectives (MEPOs).
         </div>
       ) : (
         <>
@@ -43853,13 +43863,13 @@ function AlignmentPanel({ session, alignment, hoveredObjIdx, mod }) {
           {/* Module Learning Objectives */}
           <div style={{ marginTop: 18 }}>
             <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline" }}>
-              <div style={{ fontWeight: 600, fontSize: 12 }}>Module Learning Objectives</div>
+              <div style={{ fontWeight: 600, fontSize: 12 }}>{window.objTerm(mod?.phase).full}</div>
               <div style={{ fontSize: 11, color: "var(--grey-11)" }}>{alignment.mlos.length} aligned</div>
             </div>
             <div className="col" style={{ gap: 8, marginTop: 8 }}>
               {alignment.mlos.map(m => (
                 <div key={m.code} style={{ borderLeft: "2px solid var(--brand-cyan)", paddingLeft: 10 }}>
-                  <div style={{ fontWeight: 600, fontSize: 12 }}>{m.code}</div>
+                  <div style={{ fontWeight: 600, fontSize: 12 }}>{window.objTerm(mod?.phase).short === "CLO" ? String(m.code).replace(/^MLO\b/, "CLO") : m.code}</div>
                   <div style={{ fontSize: 11.5, color: "var(--ink-2)", marginTop: 2, lineHeight: 1.45 }}>{m.text}</div>
                   <div className="row" style={{ gap: 4, marginTop: 6 }}>
                     {(m.mepo || m.mepos || []).map(c => <span key={c} className="pill violet">{c.replace(/\s+/g, "")}</span>)}
@@ -43867,7 +43877,7 @@ function AlignmentPanel({ session, alignment, hoveredObjIdx, mod }) {
                 </div>
               ))}
               {!alignment.mlos.length && (
-                <div className="pill warn" style={{ display: "inline-flex" }}>No MLOs aligned — review objective tagging.</div>
+                <div className="pill warn" style={{ display: "inline-flex" }}>No {window.objTerm(mod?.phase).short}s aligned — review objective tagging.</div>
               )}
             </div>
           </div>
@@ -43930,7 +43940,7 @@ function AlignmentPanel({ session, alignment, hoveredObjIdx, mod }) {
           {/* Trace summary */}
           <div style={{ marginTop: 22, padding: 12, background: "var(--grey-1)", border: "1px solid var(--grey-3)", borderRadius: 6, fontSize: 11.5, color: "var(--ink-2)", lineHeight: 1.5 }}>
             <div className="t-eyebrow" style={{ marginBottom: 6 }}>For accreditors</div>
-            This session contributes evidence for {alignment.mlos.length} module-level objective{alignment.mlos.length === 1 ? "" : "s"} which roll up to {alignment.mepos.length} program-level objective{alignment.mepos.length === 1 ? "" : "s"}.
+            This session contributes evidence for {alignment.mlos.length} {window.objTerm(mod?.phase).short === "CLO" ? "clerkship" : "module"}-level objective{alignment.mlos.length === 1 ? "" : "s"} which roll up to {alignment.mepos.length} program-level objective{alignment.mepos.length === 1 ? "" : "s"}.
           </div>
         </>
       )}
