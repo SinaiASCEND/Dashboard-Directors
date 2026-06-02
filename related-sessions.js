@@ -47,6 +47,12 @@
     return (s || "").toLowerCase().replace(/\s+/g, " ").trim();
   }
 
+  // Phase 2/3 clerkship detector (mirrors the dashboards' objTerm logic).
+  function isClerkshipPhase(phase) {
+    const p = String(phase == null ? "" : phase);
+    return /clerkship/i.test(p) || /phase\s*[23]\b/i.test(p) || /^\s*[23]\s*$/.test(p);
+  }
+
   // ---------------------------------------------------------------------------
   // Per-session feature extraction (memoized in a WeakMap by session ref)
   // ---------------------------------------------------------------------------
@@ -68,6 +74,9 @@
     for (const mloText of (session.mepos || [])) {
       const arr = mepoLookup.get(norm(mloText));
       if (arr) arr.forEach(n => mepos.add(n));
+      // Clerkship sessions store canonical "MEPO N" codes directly here.
+      const code = String(mloText).match(/MEPO\s*(\d+)/i);
+      if (code) mepos.add(parseInt(code[1], 10));
     }
     const mlos = new Set();
     (session.objectives || []).forEach(o => (o.mlos || []).forEach(n => mlos.add(n)));
@@ -165,16 +174,34 @@
     const within = [];
     const across = [];
 
+    // Phase-aware partitioning. For a Phase 2/3 clerkship session, "Within"
+    // means OTHER clerkships (the session's own clerkship is excluded) and
+    // "Across" means Phase 1 modules. For a Phase 1 module session the original
+    // behaviour is preserved: "Within" = same module, "Across" = other Phase 1
+    // modules (clerkships are not surfaced).
+    const targetMod = MODULES.find(m => m.id === targetModId);
+    const targetIsClerk = !!(targetMod && isClerkshipPhase(targetMod.phase));
+
     for (const m of MODULES) {
       const pack = SESSIONS[m.id];
       if (!pack || !pack.sessions) continue;
+      const candIsClerk = isClerkshipPhase(m.phase);
       const sameModule = m.id === targetModId;
+
+      let bucket;
+      if (targetIsClerk) {
+        if (sameModule) continue;                  // exclude the session's own clerkship
+        bucket = candIsClerk ? within : across;    // other clerkships → Within; Phase 1 → Across
+      } else {
+        if (candIsClerk) continue;                 // Phase 1 target: keep as-is, don't surface clerkships
+        bucket = sameModule ? within : across;
+      }
+
       for (const cand of pack.sessions) {
         if (sameModule && cand.id === target.id) continue;
         const r = scoreRelated(target, cand, sameModule, { keywordsOnly });
         if (r.score < minScore) continue;
-        const entry = { session: cand, mod: m, score: r.score, reasons: r.reasons };
-        (sameModule ? within : across).push(entry);
+        bucket.push({ session: cand, mod: m, score: r.score, reasons: r.reasons });
       }
     }
     within.sort((a, b) => b.score - a.score);
@@ -282,10 +309,10 @@
         }}>
           {related.within.length > 0 && (
             <RelatedColumn
-              title={`Within ${mod ? (mod.short || mod.name || "this unit") : "this unit"}`}
-              subtitle={mod && mod.short && mod.name && mod.short !== mod.name ? mod.name : ""}
+              title={mod && isClerkshipPhase(mod.phase) ? "Within Phase 2/3" : `Within ${mod ? (mod.short || mod.name || "this unit") : "this unit"}`}
+              subtitle={mod && isClerkshipPhase(mod.phase) ? "" : (mod && mod.short && mod.name && mod.short !== mod.name ? mod.name : "")}
               items={related.within}
-              showModuleBadge={false}
+              showModuleBadge={!!(mod && isClerkshipPhase(mod.phase))}
               onOpen={(e) => setCompare(e)}
               activeId={compare && compare.session && compare.session.id}
             />
@@ -665,14 +692,14 @@
             ) : (
               <>
                 <MobileSubsection
-                  title={`Within ${mod ? (mod.short || mod.name || "this unit") : "this unit"}`}
+                  title={mod && isClerkshipPhase(mod.phase) ? "Within Phase 2/3" : `Within ${mod ? (mod.short || mod.name || "this unit") : "this unit"}`}
                   count={related.within.length}
                   open={withinOpen}
                   setOpen={setWithinOpen}
                   palette={P}
                   items={related.within}
-                  showModuleBadge={false}
-                  emptyHint={mod ? `No other ${mod.short} sessions matched.` : null}
+                  showModuleBadge={!!(mod && isClerkshipPhase(mod.phase))}
+                  emptyHint={mod && isClerkshipPhase(mod.phase) ? "No related sessions in other Phase 2/3 clerkships." : (mod ? `No other ${mod.short} sessions matched.` : null)}
                   onOpen={onOpen}
                 />
                 <MobileSubsection
