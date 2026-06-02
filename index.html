@@ -43599,7 +43599,7 @@ function ModuleSummaryCardD({ m, pack }) {
       <button onClick={() => setOpen(v => !v)}
               style={{ background: "transparent", border: "none", padding: "6px 0", cursor: "pointer", display: "flex", alignItems: "center", gap: 8, fontFamily: "inherit", color: "var(--brand-cyan-deep)", fontSize: 12, fontWeight: 600 }}>
         <Caret open={open}/>
-        {open ? "Hide Module Summary" : "Show Module Summary"}
+        {open ? ("Hide " + (window.objTerm(m.phase).short === "CLO" ? "Clerkship" : "Module") + " Summary") : ("Show " + (window.objTerm(m.phase).short === "CLO" ? "Clerkship" : "Module") + " Summary")}
       </button>
       {open && (
         <div style={{ background: "var(--grey-1)", borderRadius: 8, padding: "12px 16px", border: "1px solid var(--grey-2)", marginTop: 4 }}>
@@ -44593,6 +44593,16 @@ window.MODULE_DIRECTORS = {
   pom1:  "Joanne Hojsak",
   pom2:  "Michael Herscher",
   pom3:  "Bess Storch",
+
+  // Phase 2 — Core clerkships
+  em:         "Shefali Trivedi (Director), Chandni Pawar (Associate Director)",
+  medicine:   "Eve Merrill (Director), Rex Hermansen (Associate Director)",
+  neurology:  "Matthew Swan (Director), Andrea Lendaris (Associate Director)",
+  obgyn:      "Katherine Chen (Director), Cynthia Abraham (Associate Director)",
+  palliative: "Lauren Wagner (Director)",
+  peds:       "Dessi Tsevdos (Associate Director)",
+  psych:      "Mercedes Perez-Rodriguez (Director), Yael Kufert (Associate Director)",
+  surgery:    "Michael Chietero, Susan Lerner, Adam Korayem (Co-Directors)",
 };
 
 window.CA_LEADERSHIP = [
@@ -47367,7 +47377,7 @@ function ModuleDetailBody({ item, onOpenItem }) {
       <button onClick={() => setSummaryOpen((v) => !v)}
               style={{ background: "transparent", border: "none", padding: "8px 4px", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit", color: BRAND.cyanDeep, fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
         {summaryOpen ? <IconChevD size={14} stroke={BRAND.cyanDeep} sw={2.4}/> : <IconChevR size={14} stroke={BRAND.cyanDeep} sw={2.4}/>}
-        {summaryOpen ? "Hide Module Summary" : "Show Module Summary"}
+        {summaryOpen ? ("Hide " + (window.objTerm(m.phase).short === "CLO" ? "Clerkship" : "Module") + " Summary") : ("Show " + (window.objTerm(m.phase).short === "CLO" ? "Clerkship" : "Module") + " Summary")}
       </button>
       {summaryOpen && (
         <InfoBlock label="Module summary">
