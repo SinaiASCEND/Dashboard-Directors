@@ -36240,6 +36240,17 @@ window.SESSIONS = (function() {
     if (Number.isFinite(n)) existing = (pack.sessions || []).find(s => s.n === n);
     if (!existing) existing = (pack.sessions || []).find(s =>
       (s.title || "").trim().toLowerCase() === (name || "").trim().toLowerCase());
+    // Prefix-tolerant fallback: curriculum-map titles often carry a topic
+    // prefix (e.g. "EBM: Application to Individual Patient Care") that the
+    // canonical AOC/thread sheets omit. Match on the shared suffix so we tag
+    // the real session instead of creating an empty phantom duplicate.
+    if (!existing) {
+      const nm = (name || "").trim().toLowerCase();
+      if (nm.length > 6) existing = (pack.sessions || []).find(s => {
+        const st = (s.title || "").trim().toLowerCase();
+        return st === nm || st.endsWith(": " + nm) || nm.endsWith(": " + st);
+      });
+    }
     if (existing) return existing;
     const synthN = Number.isFinite(n) ? n : ((pack.sessions || []).reduce((m, s) => Math.max(m, s.n || 0), 0) + 1);
     const fresh = {
@@ -36266,7 +36277,7 @@ window.SESSIONS = (function() {
     for (const e of (aocPack.sessions || [])) {
       if (!e.modId) continue;
       const s = ensureSession(e.modId, e.n, e.name, {
-        objectives: e.slo ? [{ slo: e.slo, mlos: [] }] : [],
+        objectives: e.slo ? [{ text: e.slo, slo: e.slo, mlos: [] }] : [],
       });
       if (!s) continue;
       if (!s.aoc) s.aoc = aocPack.code;
