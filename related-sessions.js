@@ -175,10 +175,12 @@
     const across = [];
 
     // Phase-aware partitioning. For a Phase 2/3 clerkship session, "Within"
-    // means OTHER clerkships (the session's own clerkship is excluded) and
-    // "Across" means Phase 1 modules. For a Phase 1 module session the original
-    // behaviour is preserved: "Within" = same module, "Across" = other Phase 1
-    // modules (clerkships are not surfaced).
+    // means the Practice of Medicine longitudinal modules (POM 1/2/3) and
+    // "Across" means Phase 1 — everything that is not a clerkship and not POM,
+    // i.e. Foundations, Systems, and THINQ. Clerkship-to-clerkship links are
+    // not surfaced. For a Phase 1 module session: "Within" = same module,
+    // "Across" = every other module across all phases (Phase 1, 2, and 3).
+    const POM_IDS = new Set(["pom1", "pom2", "pom3"]);
     const targetMod = MODULES.find(m => m.id === targetModId);
     const targetIsClerk = !!(targetMod && isClerkshipPhase(targetMod.phase));
 
@@ -190,10 +192,10 @@
 
       let bucket;
       if (targetIsClerk) {
-        if (sameModule) continue;                  // exclude the session's own clerkship
-        bucket = candIsClerk ? within : across;    // other clerkships → Within; Phase 1 → Across
+        if (candIsClerk) continue;                      // no clerkship-to-clerkship links
+        bucket = POM_IDS.has(m.id) ? within : across;   // POM → Within; Phase 1 + THINQ → Across
       } else {
-        if (candIsClerk) continue;                 // Phase 1 target: keep as-is, don't surface clerkships
+        // Phase 1 target: "Across" spans all phases (Phase 1, 2, and 3).
         bucket = sameModule ? within : across;
       }
 
@@ -309,7 +311,7 @@
         }}>
           {related.within.length > 0 && (
             <RelatedColumn
-              title={mod && isClerkshipPhase(mod.phase) ? "Within Phase 2/3" : `Within ${mod ? (mod.short || mod.name || "this unit") : "this unit"}`}
+              title={mod && isClerkshipPhase(mod.phase) ? "Within Practice of Medicine" : `Within ${mod ? (mod.short || mod.name || "this unit") : "this unit"}`}
               subtitle={mod && isClerkshipPhase(mod.phase) ? "" : (mod && mod.short && mod.name && mod.short !== mod.name ? mod.name : "")}
               items={related.within}
               showModuleBadge={!!(mod && isClerkshipPhase(mod.phase))}
@@ -319,7 +321,7 @@
           )}
           {related.across.length > 0 && (
             <RelatedColumn
-              title="Across ASCEND"
+              title={mod && isClerkshipPhase(mod.phase) ? "Across ASCEND Phase 1" : "Across ASCEND"}
               subtitle={`${related.across.length} from ${new Set(related.across.map(e => e.mod.id)).size} modules`}
               items={related.across}
               showModuleBadge={true}
@@ -370,7 +372,7 @@
   }
 
   function RelatedRow({ entry, showModuleBadge, active, first, onClick }) {
-    const { session: s, mod, reasons, score } = entry;
+    const { session: s, mod, reasons } = entry;
     const chips = reasonChips(reasons);
     return (
       <button
@@ -398,9 +400,6 @@
           )}
           <div style={{ flex: 1, fontSize: 12.5, fontWeight: 600, color: "var(--ink-2)", lineHeight: 1.35 }}>
             {s.title}
-          </div>
-          <div style={{ flex: "0 0 auto", fontSize: 9.5, fontWeight: 600, color: "var(--grey-11)", fontVariantNumeric: "tabular-nums", paddingTop: 1 }}>
-            {score.toFixed(1)}
           </div>
         </div>
         {chips.length > 0 && (
@@ -692,18 +691,18 @@
             ) : (
               <>
                 <MobileSubsection
-                  title={mod && isClerkshipPhase(mod.phase) ? "Within Phase 2/3" : `Within ${mod ? (mod.short || mod.name || "this unit") : "this unit"}`}
+                  title={mod && isClerkshipPhase(mod.phase) ? "Within Practice of Medicine" : `Within ${mod ? (mod.short || mod.name || "this unit") : "this unit"}`}
                   count={related.within.length}
                   open={withinOpen}
                   setOpen={setWithinOpen}
                   palette={P}
                   items={related.within}
                   showModuleBadge={!!(mod && isClerkshipPhase(mod.phase))}
-                  emptyHint={mod && isClerkshipPhase(mod.phase) ? "No related sessions in other Phase 2/3 clerkships." : (mod ? `No other ${mod.short} sessions matched.` : null)}
+                  emptyHint={mod && isClerkshipPhase(mod.phase) ? "No related Practice of Medicine sessions matched." : (mod ? `No other ${mod.short} sessions matched.` : null)}
                   onOpen={onOpen}
                 />
                 <MobileSubsection
-                  title="Across ASCEND"
+                  title={mod && isClerkshipPhase(mod.phase) ? "Across ASCEND Phase 1" : "Across ASCEND"}
                   count={related.across.length}
                   open={acrossOpen}
                   setOpen={setAcrossOpen}
